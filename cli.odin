@@ -12,6 +12,10 @@ Flag_Type :: enum {
 	Int,
 }
 
+Cmd_Error :: struct {
+	message: string,
+}
+
 Flag :: struct {
 	name:        string,
 	short_name:  string,
@@ -20,10 +24,18 @@ Flag :: struct {
 	value:       any,
 }
 
+Action_Err :: proc(args: []string) -> ^Cmd_Error
+Action_Void :: proc(args: []string)
+
+Command_Proc :: union {
+	Action_Err,
+	Action_Void,
+}
+
 Command :: struct {
 	name:        string,
 	description: string,
-	action:      proc(),
+	action:      Command_Proc,
 	flags:       map[string]Flag,
 }
 
@@ -48,7 +60,7 @@ cli_destroy :: proc(cli: ^Cli) {
 	free(cli, cli.allocator)
 }
 
-cli_add_command :: proc(cli: ^Cli, name, description: string, action: proc()) -> ^Command {
+cli_add_command :: proc(cli: ^Cli, name, description: string, action: Command_Proc) -> ^Command {
 	cmd := Command {
 		name        = name,
 		description = description,
@@ -135,8 +147,23 @@ cli_run :: proc(cli: ^Cli) -> (err: os.Errno) {
 
 
 	if command.action != nil {
-		command.action()
+		switch execute in command.action {
+		case Action_Void:
+			execute(args[2:])
+		case Action_Err:
+			if err := execute(args[2:]); err != nil {
+				fmt.printfln("Error: %s", err.message)
+				cli_print_help(cli)
+				free(err)
+				return .EPERM
+			}
+		}
 	}
-
 	return .NONE
+}
+
+cli_error :: proc(msg: string) -> ^Cmd_Error {
+	err := new(Cmd_Error)
+	err.message = msg
+	return err
 }
