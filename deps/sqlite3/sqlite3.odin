@@ -115,6 +115,9 @@ row_scan :: proc(stmt: ^Stmt, dest: ..any) {
 		case ^int:
 			v := int(column_int(stmt.handle, i32(i)))
 			val^ = v
+		case ^i64:
+			v := i64(column_int(stmt.handle, i32(i)))
+			val^ = v
 		}
 	}
 }

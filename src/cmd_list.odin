@@ -7,11 +7,14 @@ import "core:strings"
 import sql "deps:sqlite3"
 
 list_cmd :: proc(args: []string) -> ^Cmd_Error {
-	name: string = "Paul"
-	stmt, err := sql.stmt_prepare(db, "SELECT * from COMPANY WHERE NAME = ?;", name)
+	search_term: string
+	if len(args) > 0 {
+		search_term = args[0]
+	}
+	query := "select cmd, exit_code, executed_at from cmd_history where cmd like ? order by executed_at desc limit 50"
+	stmt, err := sql.stmt_prepare(db, query, search_term)
 	if err != nil {
-		fmt.println(err)
-		return nil
+		return cli_error("unable to list")
 	}
 	defer sql.stmt_close(stmt)
 
@@ -20,10 +23,11 @@ list_cmd :: proc(args: []string) -> ^Cmd_Error {
 			break
 		}
 
-		id: int
-		name: string
-		sql.row_scan(stmt, &id, &name)
-		fmt.printfln("%d: %s", id, name)
+		cmd: string
+		exit_code: int
+		executed_at: i64
+		sql.row_scan(stmt, &cmd, &exit_code, &executed_at)
+		fmt.printfln("%s: %d: %d", cmd, exit_code, executed_at)
 	}
 	return nil
 }
