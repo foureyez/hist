@@ -1,8 +1,8 @@
 build:
-	odin build . -out:cmdh -collection:deps=deps -debug
+	odin build ./src -out:cmdh -collection:deps=deps -debug
 
 build-release:
-	odin build . -out:cmdh -collection:deps=deps -o:speed -no-bounds-check -disable-assert
+	odin build ./src -out:cmdh -collection:deps=deps -o:speed -no-bounds-check -disable-assert
 
 run:
-	odin run . -out:cmdh -collection:deps=deps -o:speed -sanitize:address 
+	odin run ./src -out:cmdh -collection:deps=deps -o:speed -sanitize:address 
