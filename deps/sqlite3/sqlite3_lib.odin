@@ -3,7 +3,7 @@ package sqlite3
 import "core:c"
 
 when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
-	foreign import lib "lib/macos-arm64/libsqlite3.a"
+	foreign import sqlite {"lib/macos-arm64/libsqlite3.a", "system:pthread", "system:dl"}
 }
 
 sqlite3 :: rawptr
@@ -11,7 +11,7 @@ sqlite3_stmt :: rawptr
 
 
 @(default_calling_convention = "c", link_prefix = "sqlite3_")
-foreign lib {
+foreign sqlite {
 	config :: proc(flag: ..c.int) -> ResultCode ---
 	open :: proc(path: cstring, db: ^^sqlite3) -> ResultCode ---
 	close :: proc(db: ^sqlite3) -> ResultCode ---

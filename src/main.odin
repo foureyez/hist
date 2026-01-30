@@ -1,12 +1,16 @@
 package main
 
+import "./cli"
 import "core:fmt"
 import "core:log"
 import "core:mem"
+import os "core:os/os2"
+import "core:path/filepath"
 import sql "deps:sqlite3"
 
 db: ^sql.DB
-DB_PATH :: "./test.db"
+APP_HOME :: ".config/cmdh"
+DB_NAME :: "sqlite.db"
 
 main :: proc() {
 
@@ -20,26 +24,41 @@ main :: proc() {
 		defer reset_tracking_allocator()
 
 	} else {
+		//TODO: Create file logger instead
 		cl := log.create_console_logger(.Error)
 		context.logger = cl
 	}
 
+	home_dir, err := os.user_home_dir(context.allocator)
+	if err != nil {
+		log.fatalf("Unable to get home dir: %s", err)
+	}
 
-	err: sql.Error
-	db, err = sql.db_open(DB_PATH)
+	app_path := filepath.join([]string{home_dir, APP_HOME})
+	os.mkdir_all(app_path)
+	db_path := filepath.join([]string{app_path, DB_NAME})
+	defer {
+		delete(app_path)
+		delete(db_path)
+		delete(home_dir)
+	}
+
+
+	derr: sql.Error
+	db, derr = sql.db_open(db_path)
 	if err != nil {
 		log.fatalf("Unable to open db: %s", err)
 	}
 	defer sql.db_close(db)
 
-	cli := cli_create(context.allocator)
-	defer cli_destroy(cli)
+	app_cli := cli.create(context.allocator)
+	defer cli.destroy(app_cli)
 
-	cli_add_command(cli, "add", "stores the cli command", add_cmd)
-	cli_add_command(cli, "list", "lists the stored cli commands", list_cmd)
-	cli_add_command(cli, "version", "prints the cmdh version", version_cmd)
+	cli.add_command(app_cli, "add", "stores the cli command", add_cmd)
+	cli.add_command(app_cli, "list", "lists the stored cli commands", list_cmd)
+	cli.add_command(app_cli, "version", "prints the cmdh version", version_cmd)
 
-	cli_run(cli)
+	cli.cli_run(app_cli)
 }
 
 

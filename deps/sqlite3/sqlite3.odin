@@ -5,6 +5,7 @@ import "core:c"
 import "core:fmt"
 import "core:log"
 import "core:strings"
+import "core:time"
 
 DB :: struct {
 	handle: ^sqlite3,
@@ -115,9 +116,9 @@ row_scan :: proc(stmt: ^Stmt, dest: ..any) {
 		case ^int:
 			v := int(column_int(stmt.handle, i32(i)))
 			val^ = v
-		case ^i64:
+		case ^time.Time:
 			v := i64(column_int(stmt.handle, i32(i)))
-			val^ = v
+			val^ = time.from_nanoseconds(v)
 		}
 	}
 }

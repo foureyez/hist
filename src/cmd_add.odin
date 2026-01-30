@@ -1,6 +1,7 @@
 package main
 
 import "base:runtime"
+import "cli"
 import "core:c"
 import "core:fmt"
 import "core:log"
@@ -9,9 +10,9 @@ import "core:time"
 import sql "deps:sqlite3"
 
 
-add_cmd :: proc(args: []string) -> ^Cmd_Error {
+add_cmd :: proc(args: []string) -> ^cli.Error {
 	if len(args) < 2 {
-		return cli_error("'cmd' and 'exit code' required")
+		return cli.error("'cmd' and 'exit code' required")
 	}
 
 	cmd := args[0]
@@ -25,7 +26,7 @@ add_cmd :: proc(args: []string) -> ^Cmd_Error {
 	}
 	defer sql.stmt_close(stmt)
 
-	affected, eerr := sql.stmt_exec(stmt, cmd, exit_code, time.time_to_unix(time.now()))
+	affected, eerr := sql.stmt_exec(stmt, cmd, exit_code, time.time_to_unix_nano(time.now()))
 	if err != nil {
 		log.errorf("unable to exec stmt: %s", err)
 		return nil

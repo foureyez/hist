@@ -1,4 +1,4 @@
-package main
+package cli
 
 import "base:runtime"
 import "core:fmt"
@@ -12,7 +12,7 @@ Flag_Type :: enum {
 	Int,
 }
 
-Cmd_Error :: struct {
+Error :: struct {
 	message: string,
 }
 
@@ -24,7 +24,7 @@ Flag :: struct {
 	value:       any,
 }
 
-Action_Err :: proc(args: []string) -> ^Cmd_Error
+Action_Err :: proc(args: []string) -> ^Error
 Action_Void :: proc(args: []string)
 
 Command_Proc :: union {
@@ -45,14 +45,14 @@ Cli :: struct {
 	allocator: runtime.Allocator,
 }
 
-cli_create :: proc(allocator: runtime.Allocator) -> ^Cli {
+create :: proc(allocator: runtime.Allocator) -> ^Cli {
 	cli := new(Cli, allocator)
 	cli.allocator = allocator
 	cli.commands = make(map[string]Command, allocator)
 	return cli
 }
 
-cli_destroy :: proc(cli: ^Cli) {
+destroy :: proc(cli: ^Cli) {
 	for _, cmd in cli.commands {
 		delete(cmd.flags)
 	}
@@ -60,7 +60,7 @@ cli_destroy :: proc(cli: ^Cli) {
 	free(cli, cli.allocator)
 }
 
-cli_add_command :: proc(cli: ^Cli, name, description: string, action: Command_Proc) -> ^Command {
+add_command :: proc(cli: ^Cli, name, description: string, action: Command_Proc) -> ^Command {
 	cmd := Command {
 		name        = name,
 		description = description,
@@ -162,8 +162,8 @@ cli_run :: proc(cli: ^Cli) -> (err: os.Errno) {
 	return .NONE
 }
 
-cli_error :: proc(msg: string) -> ^Cmd_Error {
-	err := new(Cmd_Error)
+error :: proc(msg: string) -> ^Error {
+	err := new(Error)
 	err.message = msg
 	return err
 }
