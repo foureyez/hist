@@ -4,7 +4,9 @@ import "base:runtime"
 import "cli"
 import "core:c"
 import "core:fmt"
+import "core:log"
 import "core:math/rand"
+import "core:strconv"
 import "core:strings"
 import "core:thread"
 import "core:time"
@@ -28,6 +30,10 @@ list_cmd :: proc(args: []string) -> ^cli.Error {
 	cmd_infos := fetch_cmd_info(filter)
 	defer delete(cmd_infos)
 
+	for c in cmd_infos {
+		log.info(c.cmd)
+	}
+
 	ui := tui.new({.FULLSCREEN})
 	defer tui.cleanup(&ui)
 	query: strings.Builder
@@ -43,15 +49,18 @@ list_cmd :: proc(args: []string) -> ^cli.Error {
 			}
 		}
 
-
-		for x in 0 ..< ui.buffer.width {
-			for y in 0 ..< ui.buffer.height {
-				tui.raw_draw(&ui, x, y, alpha[rand.int_max(12)], .White)
-			}
+		for c in cmd_infos {
+			tui.write_string(&ui, c.cmd)
 		}
 
+		// for x in 0 ..< ui.buffer.width {
+		// 	for y in 0 ..< ui.buffer.height {
+		// tui.raw_draw(&ui, x, y, alpha[rand.int_max(12)], .White)
+		// 	}
+		// }
+		//
 		tui.render_frame(&ui)
-		// time.sleep(16 * time.Millisecond)
+		time.sleep(16 * time.Millisecond)
 	}
 	return nil
 }

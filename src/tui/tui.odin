@@ -5,6 +5,7 @@ import "core:unicode/utf8"
 Context :: struct {
 	config_flags: Config_Flags,
 	buffer:       Buffer,
+	curr_line:    int,
 }
 
 Event :: union {
@@ -70,6 +71,12 @@ raw_draw :: proc(ctx: ^Context, x, y: int, text: string, color: Color) {
 	draw_text(&ctx.buffer, x, y, text, color)
 }
 
+write_string :: proc(ctx: ^Context, text: string, color: Color = .White) {
+	draw_text(&ctx.buffer, 0, ctx.curr_line, text, color)
+	ctx.curr_line += 1
+}
+
 render_frame :: proc(ctx: ^Context) {
 	render_buffer(&ctx.buffer)
+	ctx.curr_line = 0
 }
