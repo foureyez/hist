@@ -35,7 +35,6 @@ enable_raw_mode :: proc() {
 disable_raw_mode :: proc() {
 	// Restore original settings
 	posix.tcsetattr(posix.STDIN_FILENO, .TCSAFLUSH, &orig_termios)
-	show_cursor()
 }
 
 

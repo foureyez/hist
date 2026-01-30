@@ -3,7 +3,8 @@ package tui
 import "core:unicode/utf8"
 
 Context :: struct {
-	buffer: Buffer,
+	config_flags: Config_Flags,
+	buffer:       Buffer,
 }
 
 Event :: union {
@@ -18,7 +19,16 @@ TypeEvent :: struct {
 NoneEvent :: struct {
 }
 
-new :: proc() -> Context {
+Config_Flags :: bit_set[Config_Flag]
+Config_Flag :: enum {
+	FULLSCREEN,
+}
+
+new :: proc(config_flags: Config_Flags) -> Context {
+	if .FULLSCREEN in config_flags {
+		enable_alt_buffer()
+	}
+
 	enable_raw_mode()
 	hide_cursor()
 
@@ -29,7 +39,8 @@ new :: proc() -> Context {
 
 	buf := init_buffer(term_size.cols, term_size.rows)
 	ctx := Context {
-		buffer = buf,
+		buffer       = buf,
+		config_flags = config_flags,
 	}
 	return ctx
 }
@@ -38,6 +49,10 @@ cleanup :: proc(ctx: ^Context) {
 	destroy_buffer(&ctx.buffer)
 	disable_raw_mode()
 	show_cursor()
+	reset_cursor()
+	if .FULLSCREEN in ctx.config_flags {
+		disable_alt_buffer()
+	}
 }
 
 poll_event :: proc(ctx: ^Context) -> Event {
@@ -51,7 +66,7 @@ poll_event :: proc(ctx: ^Context) -> Event {
 	return NoneEvent{}
 }
 
-draw :: proc(ctx: ^Context, x, y: int, text: string, color: Color) {
+raw_draw :: proc(ctx: ^Context, x, y: int, text: string, color: Color) {
 	draw_text(&ctx.buffer, x, y, text, color)
 }
 

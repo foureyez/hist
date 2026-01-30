@@ -34,3 +34,13 @@ set_color :: proc(c: Color) {
 // Hide/Show Cursor (Important for clean UI)
 hide_cursor :: proc() {fmt.print("\x1b[?25l")}
 show_cursor :: proc() {fmt.print("\x1b[?25h")}
+reset_cursor :: proc() {
+	// \x1b[0m    = Reset all colors/styles
+	// \x1b[2K    = Clear the entire current line
+	// \r         = Move to start of line
+	fmt.print("\x1b[0m\x1b[2K\r")
+}
+
+
+enable_alt_buffer :: proc() {fmt.print("\x1b[?1049h")}
+disable_alt_buffer :: proc() {fmt.print("\x1b[?1049l")}

@@ -28,7 +28,7 @@ list_cmd :: proc(args: []string) -> ^cli.Error {
 	cmd_infos := fetch_cmd_info(filter)
 	defer delete(cmd_infos)
 
-	ui := tui.new()
+	ui := tui.new({.FULLSCREEN})
 	defer tui.cleanup(&ui)
 	query: strings.Builder
 
@@ -46,7 +46,7 @@ list_cmd :: proc(args: []string) -> ^cli.Error {
 
 		for x in 0 ..< ui.buffer.width {
 			for y in 0 ..< ui.buffer.height {
-				tui.draw(&ui, x, y, alpha[rand.int_max(12)], .White)
+				tui.raw_draw(&ui, x, y, alpha[rand.int_max(12)], .White)
 			}
 		}
 
