@@ -11,6 +11,11 @@ import "core:sys/unix"
 @(private)
 orig_termios: posix.termios
 
+TermSize :: struct {
+	rows: int,
+	cols: int,
+}
+
 enable_raw_mode :: proc() {
 	posix.tcgetattr(posix.STDIN_FILENO, &orig_termios)
 
@@ -38,7 +43,7 @@ disable_raw_mode :: proc() {
 }
 
 
-get_term_size :: proc() -> (TermSize, bool) {
+get_term_size :: proc(fd: i32) -> (TermSize, bool) {
 	winsize :: struct {
 		row, col, xpixel, ypixel: u16,
 	}
@@ -46,11 +51,11 @@ get_term_size :: proc() -> (TermSize, bool) {
 	ws := winsize{}
 
 	when ODIN_OS == .Darwin {
-		res := darwin.syscall_ioctl(1, darwin.TIOCGWINSZ, &ws)
+		res := darwin.syscall_ioctl(fd, darwin.TIOCGWINSZ, &ws)
 	} else {
 		// TIOCGWINSZ is the magic number to request Window Size
 		// 1 is usually stdout (or os.stdout.handle)
-		res := linux.ioctl(linux.STDOUT_FILENO, linux.TIOCGWINSZ, &ws)
+		res := linux.ioctl(fd, linux.TIOCGWINSZ, &ws)
 	}
 
 
@@ -61,9 +66,9 @@ get_term_size :: proc() -> (TermSize, bool) {
 	return TermSize{rows = int(ws.row), cols = int(ws.col)}, true
 }
 
-has_input :: proc() -> bool {
+has_input :: proc(fd: os.Handle) -> bool {
 	pfd: posix.pollfd
-	pfd.fd = posix.STDIN_FILENO
+	pfd.fd = posix.FD(fd)
 	pfd.events = {.IN}
 
 	// Timeout 0 means return immediately (don't block)

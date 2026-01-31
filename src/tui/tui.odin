@@ -1,11 +1,13 @@
 package tui
 
+import "core:os"
 import "core:unicode/utf8"
 
 Context :: struct {
 	config_flags: Config_Flags,
 	buffer:       Buffer,
 	curr_line:    int,
+	output:       os.Handle,
 }
 
 Event :: union {
@@ -14,7 +16,7 @@ Event :: union {
 }
 
 TypeEvent :: struct {
-	key: rune,
+	key: Key,
 }
 
 NoneEvent :: struct {
@@ -25,15 +27,15 @@ Config_Flag :: enum {
 	FULLSCREEN,
 }
 
-new :: proc(config_flags: Config_Flags) -> Context {
+new :: proc(config_flags: Config_Flags = nil, output: os.Handle = os.stderr) -> Context {
 	if .FULLSCREEN in config_flags {
-		enable_alt_buffer()
+		enable_alt_buffer(output)
 	}
 
 	enable_raw_mode()
-	hide_cursor()
+	hide_cursor(output)
 
-	term_size, ok := get_term_size()
+	term_size, ok := get_term_size(i32(output))
 	if !ok {
 		panic("unable to get termsize")
 	}
@@ -42,6 +44,7 @@ new :: proc(config_flags: Config_Flags) -> Context {
 	ctx := Context {
 		buffer       = buf,
 		config_flags = config_flags,
+		output       = output,
 	}
 	return ctx
 }
@@ -49,18 +52,18 @@ new :: proc(config_flags: Config_Flags) -> Context {
 cleanup :: proc(ctx: ^Context) {
 	destroy_buffer(&ctx.buffer)
 	disable_raw_mode()
-	show_cursor()
-	reset_cursor()
+	show_cursor(ctx.output)
+	reset_cursor(ctx.output)
 	if .FULLSCREEN in ctx.config_flags {
-		disable_alt_buffer()
+		disable_alt_buffer(ctx.output)
 	}
 }
 
 poll_event :: proc(ctx: ^Context) -> Event {
 	clear_buffer(&ctx.buffer)
-	key := read_key()
+	key := read_key(ctx.output)
 
-	if utf8.valid_rune(key) {
+	if key.type != .None {
 		return TypeEvent{key = key}
 	}
 
@@ -77,6 +80,6 @@ write_string :: proc(ctx: ^Context, text: string, color: Color = .White) {
 }
 
 render_frame :: proc(ctx: ^Context) {
-	render_buffer(&ctx.buffer)
+	render_buffer(ctx)
 	ctx.curr_line = 0
 }

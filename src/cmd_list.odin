@@ -20,6 +20,11 @@ Command_Info :: struct {
 	executed_at: time.Time,
 }
 
+UI_Model :: struct {
+	cmds:     []Command_Info,
+	selected: int,
+}
+
 alpha := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"}
 list_cmd :: proc(args: []string) -> ^cli.Error {
 	filter := ""
@@ -28,15 +33,19 @@ list_cmd :: proc(args: []string) -> ^cli.Error {
 	}
 
 	cmd_infos := fetch_cmd_info(filter)
-	defer delete(cmd_infos)
+	selected_cmd := get_selected_cmd(cmd_infos)
+	fmt.println(selected_cmd)
+	defer free_all(context.temp_allocator)
+	return nil
+}
 
-	for c in cmd_infos {
-		log.info(c.cmd)
-	}
-
-	ui := tui.new({.FULLSCREEN})
+get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
+	ui := tui.new()
 	defer tui.cleanup(&ui)
 	query: strings.Builder
+	ui_model := UI_Model {
+		cmds = cmd_infos,
+	}
 
 	printKey: rune
 	for {
@@ -44,25 +53,33 @@ list_cmd :: proc(args: []string) -> ^cli.Error {
 
 		#partial switch e in event {
 		case tui.TypeEvent:
-			if e.key == 'q' {
-				return nil
+			#partial switch e.key.type {
+			case .Char:
+			case .Arrow_Up:
+				ui_model.selected = (ui_model.selected + 1) % ui_model.selected
+			case .Arrow_Down:
+				ui_model.selected = min(ui_model.selected - 1, 0)
+			case .Enter:
+				return ui_model.cmds[ui_model.selected].cmd
+			case .Ctrl:
+				if e.key.char == 'c' {
+					return ""
+				}
 			}
 		}
 
-		for c in cmd_infos {
-			tui.write_string(&ui, c.cmd)
+		for c, i in ui_model.cmds {
+			if i == ui_model.selected {
+				tui.write_string(&ui, c.cmd, .Cyan)
+			} else {
+				tui.write_string(&ui, c.cmd)
+			}
 		}
 
-		// for x in 0 ..< ui.buffer.width {
-		// 	for y in 0 ..< ui.buffer.height {
-		// tui.raw_draw(&ui, x, y, alpha[rand.int_max(12)], .White)
-		// 	}
-		// }
-		//
 		tui.render_frame(&ui)
 		time.sleep(16 * time.Millisecond)
 	}
-	return nil
+
 }
 
 fetch_cmd_info :: proc(search_filter: string) -> []Command_Info {
@@ -78,15 +95,21 @@ fetch_cmd_info :: proc(search_filter: string) -> []Command_Info {
 	}
 	defer sql.stmt_close(stmt)
 
-	command_infos := make([dynamic]Command_Info)
+	command_infos := make([dynamic]Command_Info, context.temp_allocator)
 
 	for {
 		if !sql.row_next(stmt) {
 			break
 		}
 		cmd_info := Command_Info{}
-		sql.row_scan(stmt, &cmd_info.cmd, &cmd_info.exit_code, &cmd_info.executed_at)
-		append_elems(&command_infos, cmd_info)
+		sql.row_scan(
+			stmt,
+			context.temp_allocator,
+			&cmd_info.cmd,
+			&cmd_info.exit_code,
+			&cmd_info.executed_at,
+		)
+		append(&command_infos, cmd_info)
 	}
 
 	return command_infos[:]

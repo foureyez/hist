@@ -27,6 +27,7 @@ foreign sqlite {
 
 
 	column_int :: proc(stmt: ^sqlite3_stmt, i_col: c.int) -> c.int ---
+	column_int64 :: proc(stmt: ^sqlite3_stmt, i_col: c.int) -> c.int64_t ---
 	column_text :: proc(stmt: ^sqlite3_stmt, i_col: c.int) -> cstring ---
 	column_double :: proc(stmt: ^sqlite3_stmt, i_col: c.int) -> c.double ---
 

@@ -26,7 +26,7 @@ add_cmd :: proc(args: []string) -> ^cli.Error {
 	}
 	defer sql.stmt_close(stmt)
 
-	affected, eerr := sql.stmt_exec(stmt, cmd, exit_code, time.time_to_unix_nano(time.now()))
+	affected, eerr := sql.stmt_exec(stmt, cmd, exit_code, time.now())
 	if err != nil {
 		log.errorf("unable to exec stmt: %s", err)
 		return nil

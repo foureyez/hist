@@ -69,8 +69,8 @@ stmt_bind :: proc(stmt: ^sqlite3_stmt, args: ..any) -> Error {
 			delete(cval)
 		case int:
 			rc = bind_int(stmt, i32(i) + 1, c.int(value))
-		case i64:
-			rc = bind_int64(stmt, i32(i) + 1, c.int64_t(value))
+		case time.Time:
+			rc = bind_int64(stmt, i32(i) + 1, c.int64_t(time.to_unix_nanoseconds(value)))
 		}
 
 		if rc != .OK {
@@ -107,17 +107,17 @@ row_next :: proc(stmt: ^Stmt) -> bool {
 	return rc == .ROW
 }
 
-row_scan :: proc(stmt: ^Stmt, dest: ..any) {
+row_scan :: proc(stmt: ^Stmt, allocator: runtime.Allocator = context.allocator, dest: ..any) {
 	for d, i in dest {
 		switch &val in d {
 		case ^string:
 			c_str := column_text(stmt.handle, i32(i))
-			val^ = string(c_str)
+			val^ = strings.clone_from_cstring(c_str, allocator)
 		case ^int:
 			v := int(column_int(stmt.handle, i32(i)))
 			val^ = v
 		case ^time.Time:
-			v := i64(column_int(stmt.handle, i32(i)))
+			v := i64(column_int64(stmt.handle, i32(i)))
 			val^ = time.from_nanoseconds(v)
 		}
 	}

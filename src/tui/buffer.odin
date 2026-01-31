@@ -1,6 +1,7 @@
 package tui
 
 import "core:fmt"
+import "core:os"
 import "core:strings"
 
 Cell :: struct {
@@ -52,25 +53,25 @@ draw_text :: proc(b: ^Buffer, x, y: int, text: string, color: Color) {
 }
 
 // The "Render" pass
-render_buffer :: proc(b: ^Buffer) {
+render_buffer :: proc(ctx: ^Context) {
 	// Reset cursor to top-left
-	move_cursor(1, 1)
+	move_cursor(ctx.output, 1, 1)
 
 	last_color := Color.Reset
 
-	for i in 0 ..< len(b.cells) {
-		cell := b.cells[i]
+	for i in 0 ..< len(ctx.buffer.cells) {
+		cell := ctx.buffer.cells[i]
 
 		// Optimization: Only print color code if it changes
 		if cell.color != last_color {
-			set_color(cell.color)
+			set_color(ctx.output, cell.color)
 			last_color = cell.color
 		}
 
-		fmt.printf("%r", cell.char)
+		os.write_rune(ctx.output, cell.char)
 
 		// Handle wrapping manually if needed, or rely on terminal width
-		if (i + 1) % b.width == 0 {
+		if (i + 1) % ctx.buffer.width == 0 {
 			// In raw mode, we might need explicit newlines depending on setup
 			// But usually, we just fill the screen.
 		}

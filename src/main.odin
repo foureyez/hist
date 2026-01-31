@@ -29,19 +29,14 @@ main :: proc() {
 		context.logger = cl
 	}
 
-	home_dir, err := os.user_home_dir(context.allocator)
+	home_dir_path, err := os.user_home_dir(context.temp_allocator)
 	if err != nil {
 		log.fatalf("Unable to get home dir: %s", err)
 	}
 
-	app_path := filepath.join([]string{home_dir, APP_HOME})
+	app_path := filepath.join([]string{home_dir_path, APP_HOME}, context.temp_allocator)
 	os.mkdir_all(app_path)
-	db_path := filepath.join([]string{app_path, DB_NAME})
-	defer {
-		delete(app_path)
-		delete(db_path)
-		delete(home_dir)
-	}
+	db_path := filepath.join([]string{app_path, DB_NAME}, context.temp_allocator)
 
 
 	derr: sql.Error
@@ -58,6 +53,7 @@ main :: proc() {
 	cli.add_command(app_cli, "list", "lists the stored cli commands", list_cmd)
 	cli.add_command(app_cli, "version", "prints the cmdh version", version_cmd)
 
+	free_all(context.temp_allocator)
 	cli.cli_run(app_cli)
 }
 
