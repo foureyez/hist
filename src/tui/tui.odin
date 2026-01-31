@@ -7,6 +7,7 @@ import "core:unicode/utf8"
 Context :: struct {
 	config_flags: Config_Flags,
 	buffer:       Buffer,
+	prev_buffer:  Buffer,
 	curr_line:    int,
 	cursor_pos:   [2]int,
 	output:       os.Handle,
@@ -46,12 +47,15 @@ new :: proc(config_flags: Config_Flags = nil, output: os.Handle = os.stderr) -> 
 
 
 	buf: Buffer
+	back_buf: Buffer
 	if .FULLSCREEN in config_flags {
 		enable_alt_buffer(output)
 		buf = init_buffer(term_size.cols, term_size.rows)
+		back_buf = init_buffer(term_size.cols, term_size.rows - cury)
 	} else {
 		// This is for starting drawing from the cursor position 
 		buf = init_buffer(term_size.cols, term_size.rows - cury)
+		back_buf = init_buffer(term_size.cols, term_size.rows - cury)
 		// Start from top and put empty lines until the cursor y pos
 		move_cursor(output, 0, 0)
 		for i in 1 ..< cury {
@@ -63,6 +67,7 @@ new :: proc(config_flags: Config_Flags = nil, output: os.Handle = os.stderr) -> 
 
 	ctx := Context {
 		buffer       = buf,
+		prev_buffer  = back_buf,
 		config_flags = config_flags,
 		output       = output,
 		cursor_pos   = {curx, cury},
