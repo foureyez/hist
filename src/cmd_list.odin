@@ -56,16 +56,18 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 		case tui.TypeEvent:
 			#partial switch e.key.type {
 			case .Char:
-			case .Arrow_Up:
-				ui_model.selected = (ui_model.selected + 1) % ui_model.selected
-			case .Arrow_Down:
-				ui_model.selected = min(ui_model.selected - 1, 0)
+			case .Up:
+				ui_model.selected = max(ui_model.selected - 1, 0)
+			case .Down:
+				ui_model.selected = min(ui_model.selected + 1, len(ui_model.cmds) - 1)
 			case .Enter:
 				return ui_model.cmds[ui_model.selected].cmd
 			case .Ctrl:
 				if e.key.char == 'c' {
 					return ""
 				}
+			case .Esc:
+				return ""
 			}
 		}
 
@@ -85,7 +87,7 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 
 fetch_cmd_info :: proc(search_filter: string) -> []Command_Info {
 	search_term := "%"
-	max_limit := 5
+	max_limit := 10
 	if len(search_filter) > 0 {
 		search_term = strings.join([]string{"%", search_filter, "%"}, "")
 	}
