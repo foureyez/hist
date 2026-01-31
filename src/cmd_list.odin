@@ -73,7 +73,7 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 
 		for c, i in ui_model.cmds {
 			if i == ui_model.selected {
-				tui.write_string(&ui, c.cmd, .Cyan)
+				tui.write_string(&ui, c.cmd, tui.Grey)
 			} else {
 				tui.write_string(&ui, c.cmd)
 			}

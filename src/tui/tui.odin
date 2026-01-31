@@ -95,12 +95,12 @@ poll_event :: proc(ctx: ^Context) -> Event {
 	return NoneEvent{}
 }
 
-raw_draw :: proc(ctx: ^Context, x, y: int, text: string, color: Color) {
-	draw_text(&ctx.buffer, x, y, text, color)
+raw_draw :: proc(ctx: ^Context, x, y: int, text: string, fg: Color, bg: Color) {
+	draw_text(&ctx.buffer, x, y, text, fg, bg)
 }
 
-write_string :: proc(ctx: ^Context, text: string, color: Color = .White) {
-	draw_text(&ctx.buffer, 0, ctx.curr_line, text, color)
+write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color = Black) {
+	draw_text(&ctx.buffer, 0, ctx.curr_line, text, fg, bg)
 	ctx.curr_line += 1
 }
 

@@ -6,16 +6,28 @@ import "core:strconv"
 import "core:strings"
 
 // Define colors
-Color :: enum {
-	Black   = 30,
-	Red     = 31,
-	Green   = 32,
-	Yellow  = 33,
-	Blue    = 34,
-	Magenta = 35,
-	Cyan    = 36,
-	White   = 37,
-	Reset   = 0,
+Color :: struct {
+	r, g, b: int,
+}
+
+None :: Color{}
+
+Black :: Color {
+	r = 0,
+	g = 0,
+	b = 0,
+}
+
+Grey :: Color {
+	r = 128,
+	g = 128,
+	b = 128,
+}
+
+White :: Color {
+	r = 255,
+	g = 255,
+	b = 255,
 }
 
 // Clear the entire screen
@@ -39,7 +51,7 @@ restore_cursor :: proc(fd: os.Handle) {
 
 // Set text color
 set_color :: proc(fd: os.Handle, c: Color) {
-	fmt.fprintf(fd, "\x1b[%dm", int(c))
+	fmt.fprintf(fd, "\x1b[%dm", int(0))
 }
 
 // Hide/Show Cursor (Important for clean UI)
