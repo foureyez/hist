@@ -4,39 +4,50 @@ import "./cli"
 import "core:fmt"
 import "core:log"
 import "core:mem"
+import oso "core:os"
 import os "core:os/os2"
 import "core:path/filepath"
 import sql "deps:sqlite3"
 
 db: ^sql.DB
-APP_HOME :: ".config/cmdh"
-DB_NAME :: "sqlite.db"
+APP_PATH :: ".config/cmdh"
+LOG_FILE_PATH :: APP_PATH + "/cmdh.log"
+DB_FILE_PATH :: APP_PATH + "/sqlite.db"
 
 main :: proc() {
 
+	level: log.Level
 	when ODIN_DEBUG {
-		cl := log.create_console_logger(.Debug)
-		context.logger = cl
-
 		tracking_allocator: mem.Tracking_Allocator
 		mem.tracking_allocator_init(&tracking_allocator, context.allocator)
 		context.allocator = mem.tracking_allocator(&tracking_allocator)
 		defer reset_tracking_allocator()
-
+		level = .Debug
 	} else {
-		//TODO: Create file logger instead
-		cl := log.create_console_logger(.Error)
-		context.logger = cl
+		level = .Error
 	}
+
 
 	home_dir_path, err := os.user_home_dir(context.temp_allocator)
 	if err != nil {
-		log.fatalf("Unable to get home dir: %s", err)
+		panic("Unable to get home dir")
 	}
 
-	app_path := filepath.join([]string{home_dir_path, APP_HOME}, context.temp_allocator)
+	app_path := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
 	os.mkdir_all(app_path)
-	db_path := filepath.join([]string{app_path, DB_NAME}, context.temp_allocator)
+
+	log_path := filepath.join([]string{home_dir_path, LOG_FILE_PATH}, context.temp_allocator)
+	mode := oso.O_WRONLY | oso.O_CREATE | oso.O_APPEND
+	log_file, lerr := oso.open(log_path, mode)
+	if err != nil {
+		panic("Unable to open log file")
+	}
+
+
+	cl := log.create_file_logger(log_file, level)
+	context.logger = cl
+
+	db_path := filepath.join([]string{home_dir_path, DB_FILE_PATH}, context.temp_allocator)
 
 
 	derr: sql.Error

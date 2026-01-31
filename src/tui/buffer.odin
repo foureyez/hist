@@ -1,6 +1,7 @@
 package tui
 
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:strings"
 
@@ -54,11 +55,9 @@ draw_text :: proc(b: ^Buffer, x, y: int, text: string, color: Color) {
 
 // The "Render" pass
 render_buffer :: proc(ctx: ^Context) {
-	// Reset cursor to top-left
-	move_cursor(ctx.output, 1, 1)
 
+	save_cursor(ctx.output)
 	last_color := Color.Reset
-
 	for i in 0 ..< len(ctx.buffer.cells) {
 		cell := ctx.buffer.cells[i]
 
@@ -76,6 +75,5 @@ render_buffer :: proc(ctx: ^Context) {
 			// But usually, we just fill the screen.
 		}
 	}
-	// Flush stdout to ensure it draws immediately
-	// Odin's fmt usually buffers, so explicit flush is good practice in loops
+	restore_cursor(ctx.output)
 }

@@ -9,6 +9,7 @@ import "core:sys/unix"
 
 // Store the original settings to restore them when the app exits
 @(private)
+tty_fd: posix.FD
 orig_termios: posix.termios
 
 TermSize :: struct {
@@ -17,7 +18,15 @@ TermSize :: struct {
 }
 
 enable_raw_mode :: proc() {
-	posix.tcgetattr(posix.STDIN_FILENO, &orig_termios)
+	// Need to open /dev/tty explicitly since the cli can be invoked as a zsh plugin.
+	// This guarantees you are configuring the actual physical terminal the user is typing into, regardless of how Zsh pipes the input/output.
+	fd := posix.open("/dev/tty", {.RDWR})
+	if fd == -1 {
+		tty_fd = posix.STDIN_FILENO
+	} else {
+		tty_fd = fd
+	}
+	posix.tcgetattr(tty_fd, &orig_termios)
 
 	raw := orig_termios
 
@@ -34,12 +43,11 @@ enable_raw_mode :: proc() {
 	raw.c_lflag -= {.ECHO, .ICANON, .ISIG} // Remove ISIG if you want CTRL+C to kill app
 
 	// 3. Apply new attributes
-	posix.tcsetattr(posix.STDIN_FILENO, .TCSAFLUSH, &raw)
+	posix.tcsetattr(tty_fd, .TCSAFLUSH, &raw)
 }
 
 disable_raw_mode :: proc() {
-	// Restore original settings
-	posix.tcsetattr(posix.STDIN_FILENO, .TCSAFLUSH, &orig_termios)
+	posix.tcsetattr(tty_fd, .TCSAFLUSH, &orig_termios)
 }
 
 

@@ -25,8 +25,10 @@ UI_Model :: struct {
 	selected: int,
 }
 
-alpha := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"}
+// alpha := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"}
 list_cmd :: proc(args: []string) -> ^cli.Error {
+	defer free_all(context.temp_allocator)
+
 	filter := ""
 	if len(args) > 0 {
 		filter = args[0]
@@ -35,12 +37,11 @@ list_cmd :: proc(args: []string) -> ^cli.Error {
 	cmd_infos := fetch_cmd_info(filter)
 	selected_cmd := get_selected_cmd(cmd_infos)
 	fmt.println(selected_cmd)
-	defer free_all(context.temp_allocator)
 	return nil
 }
 
 get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
-	ui := tui.new()
+	ui := tui.new({.FULLSCREEN})
 	defer tui.cleanup(&ui)
 	query: strings.Builder
 	ui_model := UI_Model {
@@ -84,7 +85,7 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 
 fetch_cmd_info :: proc(search_filter: string) -> []Command_Info {
 	search_term := "%"
-	max_limit := 20
+	max_limit := 5
 	if len(search_filter) > 0 {
 		search_term = strings.join([]string{"%", search_filter, "%"}, "")
 	}
