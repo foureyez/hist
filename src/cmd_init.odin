@@ -14,6 +14,7 @@ init_cmd :: proc(args: []string) -> ^cli.Error {
 	switch shell {
 	case "zsh":
 		fmt.println(string(zsh_init))
+		fmt.println("bindkey -M emacs '^r' histr-search")
 	case:
 		return cli.error("shell not supported")
 	}

@@ -2,6 +2,7 @@ package cli
 
 import "base:runtime"
 import "core:fmt"
+import "core:log"
 import "core:os"
 
 Flag_Type :: enum {
@@ -34,6 +35,7 @@ Command :: struct {
 	name:        string,
 	description: string,
 	action:      Command_Proc,
+	subcommands: map[string]Command,
 	flags:       map[string]Flag,
 }
 
@@ -58,15 +60,30 @@ destroy :: proc(cli: ^Cli) {
 	free(cli, cli.allocator)
 }
 
-add_command :: proc(cli: ^Cli, name, description: string, action: Command_Proc) -> ^Command {
+
+add_subcommand :: proc(cli: ^Cli, parent_name, name, description: string, action: Command_Proc) {
 	cmd := Command {
 		name        = name,
 		description = description,
 		action      = action,
+		flags       = make(map[string]Flag), // TODO: How to use cli allocator
+	}
+	parent, ok := &cli.commands[parent_name]
+	if !ok {
+
+	}
+	parent.subcommands[name] = cmd
+}
+
+add_command :: proc(cli: ^Cli, name, description: string, action: Command_Proc) {
+	cmd := Command {
+		name        = name,
+		description = description,
+		action      = action,
+		subcommands = make(map[string]Command, cli.allocator),
 		flags       = make(map[string]Flag, cli.allocator),
 	}
 	cli.commands[name] = cmd
-	return &cli.commands[name]
 }
 
 cli_add_flag :: proc(
@@ -120,6 +137,13 @@ cli_print_command_help :: proc(cli: ^Cli, cmd: Command) {
 	}
 }
 
+print :: proc(cli: ^Cli) {
+	for n, c in cli.commands {
+		log.infof("Command: %s", n)
+		log.infof("subcommands:%d", len(c.subcommands))
+	}
+}
+
 cli_run :: proc(cli: ^Cli) -> (err: os.Errno) {
 	args := os.args
 
@@ -143,13 +167,24 @@ cli_run :: proc(cli: ^Cli) -> (err: os.Errno) {
 		return .EPERM
 	}
 
+	final_command := command
+	arg_index := 2
+	for arg_index < len(args) {
+		curr_arg := args[arg_index]
+		subcommand, ok := command.subcommands[curr_arg]
+		if !ok {
+			break
+		}
+		final_command = subcommand
+		arg_index += 1
+	}
 
-	if command.action != nil {
-		switch execute in command.action {
+	if final_command.action != nil {
+		switch execute in final_command.action {
 		case Action_Void:
-			execute(args[2:])
+			execute(args[arg_index:])
 		case Action_Err:
-			if err := execute(args[2:]); err != nil {
+			if err := execute(args[arg_index:]); err != nil {
 				fmt.printfln("Error: %s", err.message)
 				cli_print_help(cli)
 				free(err)

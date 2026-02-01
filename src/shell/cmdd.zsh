@@ -6,7 +6,7 @@ zmodload zsh/datetime 2>/dev/null
 histr_HISTORY_ID=""
 _histr_preexec() {
     local id
-    id=$(histr history start -- "$1")
+    id=$(histr add start "$1")
     export histr_HISTORY_ID="$id"
     __histr_preexec_time=${EPOCHREALTIME-}
 }
@@ -21,7 +21,7 @@ _histr_precmd() {
         printf -v duration %.0f $(((__histr_precmd_time - __histr_preexec_time) * 1000000000))
     fi
 
-    (histr_LOG=error histr history end --exit $EXIT ${duration:+--duration=$duration} -- $histr_HISTORY_ID &) >/dev/null 2>&1
+    (histr_LOG=error histr add end --exit $EXIT ${duration:+--duration=$duration} -- $histr_HISTORY_ID &) >/dev/null 2>&1
     export histr_HISTORY_ID=""
 }
 
