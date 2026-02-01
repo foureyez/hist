@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, copilot/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Odin (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        wget -q https://github.com/odin-lang/Odin/releases/download/dev-2024-08/odin-ubuntu-amd64-dev-2024-08.zip
+        unzip -q odin-ubuntu-amd64-dev-2024-08.zip
+        sudo mv dist/odin /usr/local/bin/
+        export ODIN_ROOT=/usr/local/share/odin
+        sudo mkdir -p $ODIN_ROOT
+        sudo cp -r dist/* $ODIN_ROOT/
+        odin version
+    
+    - name: Install Odin (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        wget -q https://github.com/odin-lang/Odin/releases/download/dev-2024-08/odin-macos-amd64-dev-2024-08.zip
+        unzip -q odin-macos-amd64-dev-2024-08.zip
+        sudo mv dist/odin /usr/local/bin/
+        export ODIN_ROOT=/usr/local/share/odin
+        sudo mkdir -p $ODIN_ROOT
+        sudo cp -r dist/* $ODIN_ROOT/
+        odin version
+    
+    - name: Build (Debug)
+      run: |
+        export ODIN_ROOT=/usr/local/share/odin
+        make build
+    
+    - name: Build (Release)
+      run: |
+        export ODIN_ROOT=/usr/local/share/odin
+        make build-release
+    
+    - name: Run smoke test
+      run: |
+        export ODIN_ROOT=/usr/local/share/odin
+        chmod +x tests/smoke_test.sh
+        tests/smoke_test.sh
