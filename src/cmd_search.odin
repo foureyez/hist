@@ -18,7 +18,7 @@ UI_Model :: struct {
 	selected: int,
 }
 
-list_cmd :: proc(args: []string) -> ^cli.Error {
+search_cmd :: proc(args: []string) -> ^cli.Error {
 	defer free_all(context.temp_allocator)
 
 	filter := ""

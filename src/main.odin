@@ -66,8 +66,9 @@ main :: proc() {
 	app_cli := cli.create(context.allocator)
 	defer cli.destroy(app_cli)
 
+	cli.add_command(app_cli, "init", "prints the shell script to initialize cmdd", init_cmd)
 	cli.add_command(app_cli, "add", "stores the cli command", add_cmd)
-	cli.add_command(app_cli, "list", "lists the stored cli commands", list_cmd)
+	cli.add_command(app_cli, "search", "search the stored cli commands", search_cmd)
 	cli.add_command(app_cli, "version", "prints the cmdh version", version_cmd)
 
 	free_all(context.temp_allocator)
