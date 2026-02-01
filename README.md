@@ -1,4 +1,4 @@
-# cmdh
+# histr
 
 Command history tool written in Odin.
 

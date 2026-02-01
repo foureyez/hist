@@ -14,10 +14,10 @@ debug: build
 
 build: 
 	@echo "Building cmdd"
-	odin build ./src -out:cmdh -collection:deps=deps $(ODIN_BUILD_FLAGS)
+	odin build ./src -out:histr -collection:deps=deps $(ODIN_BUILD_FLAGS)
 
 build-deps:
 	./scripts/build_deps.sh $(DEPS_BUILD_MODE)
 
 run:
-	odin run ./src -out:cmdh -collection:deps=deps -o:speed -sanitize:address 
+	odin run ./src -out:histr -collection:deps=deps -o:speed -sanitize:address 

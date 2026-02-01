@@ -9,8 +9,8 @@ import "core:path/filepath"
 import sql "deps:sqlite3"
 
 db: ^sql.DB
-APP_PATH :: ".config/cmdh"
-LOG_FILE_PATH :: APP_PATH + "/cmdh.log"
+APP_PATH :: ".config/histr"
+LOG_FILE_PATH :: APP_PATH + "/histr.log"
 DB_FILE_PATH :: APP_PATH + "/sqlite.db"
 
 main :: proc() {
@@ -69,7 +69,7 @@ main :: proc() {
 	cli.add_command(app_cli, "init", "prints the shell script to initialize cmdd", init_cmd)
 	cli.add_command(app_cli, "add", "stores the cli command", add_cmd)
 	cli.add_command(app_cli, "search", "search the stored cli commands", search_cmd)
-	cli.add_command(app_cli, "version", "prints the cmdh version", version_cmd)
+	cli.add_command(app_cli, "version", "prints the histr version", version_cmd)
 
 	free_all(context.temp_allocator)
 	cli.cli_run(app_cli)
