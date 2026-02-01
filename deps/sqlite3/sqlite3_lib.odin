@@ -4,6 +4,8 @@ import "core:c"
 
 when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
 	foreign import sqlite {"lib/macos-arm64/libsqlite3.a", "system:pthread", "system:dl"}
+} else when ODIN_OS == .Linux {
+	foreign import sqlite "system:sqlite3"
 }
 
 sqlite3 :: rawptr

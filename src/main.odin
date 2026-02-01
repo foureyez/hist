@@ -38,8 +38,8 @@ main :: proc() {
 
 	log_path := filepath.join([]string{home_dir_path, LOG_FILE_PATH}, context.temp_allocator)
 	mode := oso.O_WRONLY | oso.O_CREATE | oso.O_APPEND
-	log_file, lerr := oso.open(log_path, mode)
-	if err != nil {
+	log_file, lerr := oso.open(log_path, mode, 0o644)
+	if lerr != nil {
 		panic("Unable to open log file")
 	}
 
@@ -52,10 +52,16 @@ main :: proc() {
 
 	derr: sql.Error
 	db, derr = sql.db_open(db_path)
-	if err != nil {
-		log.fatalf("Unable to open db: %s", err)
+	if derr != nil {
+		log.fatalf("Unable to open db: %s", derr)
 	}
 	defer sql.db_close(db)
+
+	// Initialize database schema
+	schema_err := ensure_schema(db)
+	if schema_err != nil {
+		log.fatalf("Unable to initialize database schema: %s", schema_err)
+	}
 
 	app_cli := cli.create(context.allocator)
 	defer cli.destroy(app_cli)

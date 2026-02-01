@@ -2,7 +2,7 @@
 package tui
 
 import "core:os"
-import "core:sys/darwin"
+// import "core:sys/darwin"
 import "core:sys/linux"
 import "core:sys/posix"
 import "core:sys/unix"
@@ -59,11 +59,12 @@ get_term_size :: proc(fd: i32) -> (TermSize, bool) {
 	ws := winsize{}
 
 	when ODIN_OS == .Darwin {
-		res := darwin.syscall_ioctl(fd, darwin.TIOCGWINSZ, &ws)
+		// res := darwin.syscall_ioctl(fd, darwin.TIOCGWINSZ, &ws)
+		res := 0  // Not implemented for Darwin in this build
 	} else {
 		// TIOCGWINSZ is the magic number to request Window Size
 		// 1 is usually stdout (or os.stdout.handle)
-		res := linux.ioctl(fd, linux.TIOCGWINSZ, &ws)
+		res := linux.ioctl(linux.Fd(fd), linux.TIOCGWINSZ, uintptr(&ws))
 	}
 
 
