@@ -2,7 +2,6 @@ package sqlite3
 
 import "base:runtime"
 import "core:c"
-import "core:fmt"
 import "core:log"
 import "core:strings"
 import "core:time"

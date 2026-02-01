@@ -1,8 +1,8 @@
-#+build  darwin
+#+build linux
 package tui
 
 import "core:os"
-import "core:sys/darwin"
+import "core:sys/linux"
 import "core:sys/posix"
 
 // Store the original settings to restore them when the app exits
@@ -55,7 +55,8 @@ get_term_size :: proc(fd: i32) -> (TermSize, bool) {
 	}
 
 	ws := winsize{}
-	res := darwin.syscall_ioctl(fd, darwin.TIOCGWINSZ, &ws)
+	res := linux.ioctl(linux.Fd(fd), linux.TIOCGWINSZ, cast(uintptr)&ws)
+
 	if res != 0 {
 		return TermSize{0, 0}, false
 	}

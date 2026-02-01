@@ -1,7 +1,6 @@
 #+build windows
 package otui
 
-import "core:os"
 import "core:sys/windows"
 
 enable_raw_mode :: proc() {

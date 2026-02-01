@@ -1,7 +1,6 @@
 package main
 
 import "./cli"
-import "core:fmt"
 import "core:log"
 import "core:mem"
 import oso "core:os"
@@ -38,7 +37,8 @@ main :: proc() {
 
 	log_path := filepath.join([]string{home_dir_path, LOG_FILE_PATH}, context.temp_allocator)
 	mode := oso.O_WRONLY | oso.O_CREATE | oso.O_APPEND
-	log_file, lerr := oso.open(log_path, mode)
+	perm := 0o700
+	log_file, lerr := oso.open(log_path, mode, perm)
 	if lerr != nil {
 		panic("Unable to open log file")
 	}

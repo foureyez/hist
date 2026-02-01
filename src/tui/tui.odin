@@ -1,9 +1,7 @@
 package tui
 
-import "core:log"
 import "core:os"
 import "core:strings"
-import "core:unicode/utf8"
 
 Context :: struct {
 	config_flags:  Config_Flags,
@@ -26,8 +24,7 @@ TypeEvent :: struct {
 	key: Key,
 }
 
-NoneEvent :: struct {
-}
+NoneEvent :: struct {}
 
 Config_Flags :: bit_set[Config_Flag]
 Config_Flag :: enum {
@@ -56,7 +53,7 @@ new :: proc(config_flags: Config_Flags = nil, output: os.Handle = os.stderr) -> 
 		buf = init_buffer(term_size.cols, term_size.rows - cury)
 		back_buf = init_buffer(term_size.cols, term_size.rows - cury)
 
-		// This is for starting drawing from the cursor position 
+		// This is for starting drawing from the cursor position
 		// Start from top and put empty lines until the cursor y pos
 		move_cursor(output, 0, 0)
 		for i in 1 ..< cury {

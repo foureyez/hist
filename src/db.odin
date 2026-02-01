@@ -1,6 +1,5 @@
 package main
 
-import "core:fmt"
 import "core:log"
 import "core:strings"
 import sql "deps:sqlite3"
@@ -39,8 +38,7 @@ ensure_schema :: proc(db: ^sql.DB) -> sql.Error {
 		return exec_err
 	}
 
-	// Optionally you can add more migrations here.
-	fmt.println("Database schema ensured")
+	log.info("Database schema ensured")
 	return nil
 }
 

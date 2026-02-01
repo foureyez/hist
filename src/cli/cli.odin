@@ -3,8 +3,6 @@ package cli
 import "base:runtime"
 import "core:fmt"
 import "core:os"
-import "core:strconv"
-import "core:strings"
 
 Flag_Type :: enum {
 	Bool,

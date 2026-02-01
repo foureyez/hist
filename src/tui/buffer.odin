@@ -1,8 +1,5 @@
 package tui
 
-import "core:fmt"
-import "core:log"
-import "core:math/rand"
 import "core:os"
 import "core:strings"
 
@@ -78,7 +75,7 @@ render_buffer :: proc(ctx: ^Context) {
 			ctx.back_buffer.cells[i] = ctx.buffer.cells[i]
 		}
 
-		// Faster than calculating x and y at the start of the loop 
+		// Faster than calculating x and y at the start of the loop
 		// x = i % ctx.buffer.width
 		// y = i / ctx.buffer.width
 		x += 1

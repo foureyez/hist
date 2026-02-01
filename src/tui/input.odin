@@ -1,10 +1,6 @@
 package tui
 
-import "core:fmt"
-import "core:log"
 import "core:os"
-import "core:sys/posix"
-import "core:time"
 import "core:unicode/utf8"
 
 Key :: struct {
@@ -32,7 +28,7 @@ Key_Type :: enum {
 	Right,
 }
 
-// Blocks until timeout has reached 
+// Blocks until timeout has reached
 read_key :: proc(fd: os.Handle, timeout_ms: int) -> Key {
 	if !has_input(fd, timeout_ms) {
 		return Key{.None, 0}
