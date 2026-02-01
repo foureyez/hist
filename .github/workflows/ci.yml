@@ -8,6 +8,8 @@ on:
 
 jobs:
   build-and-test:
+    permissions:
+      contents: read
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
