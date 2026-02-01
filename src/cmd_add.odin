@@ -5,6 +5,7 @@ import "cli"
 import "core:c"
 import "core:fmt"
 import "core:log"
+import "core:strconv"
 import "core:strings"
 import "core:time"
 import sql "deps:sqlite3"
@@ -16,7 +17,14 @@ add_cmd :: proc(args: []string) -> ^cli.Error {
 	}
 
 	cmd := args[0]
-	exit_code := args[1]
+	exit_code_str := args[1]
+
+	// Parse exit code to integer
+	exit_code, parse_ok := strconv.parse_int(exit_code_str)
+	if !parse_ok {
+		log.errorf("invalid exit code: %s", exit_code_str)
+		return cli.error("exit code must be a valid integer")
+	}
 
 	query := "insert into cmd_history(cmd, exit_code, executed_at) values(?, ?, ?)"
 	stmt, err := sql.stmt_prepare(db, query)
@@ -27,8 +35,8 @@ add_cmd :: proc(args: []string) -> ^cli.Error {
 	defer sql.stmt_close(stmt)
 
 	affected, eerr := sql.stmt_exec(stmt, cmd, exit_code, time.now())
-	if err != nil {
-		log.errorf("unable to exec stmt: %s", err)
+	if eerr != nil {
+		log.errorf("unable to exec stmt: %s", eerr)
 		return nil
 	}
 
