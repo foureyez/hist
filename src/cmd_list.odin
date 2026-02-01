@@ -2,16 +2,9 @@ package main
 
 import "base:runtime"
 import "cli"
-import "core:c"
 import "core:fmt"
-import "core:log"
-import "core:math/rand"
-import "core:strconv"
 import "core:strings"
-import "core:thread"
 import "core:time"
-import "core:unicode/utf8"
-import sql "deps:sqlite3"
 import "tui"
 
 Command_Info :: struct {
@@ -33,7 +26,11 @@ list_cmd :: proc(args: []string) -> ^cli.Error {
 		filter = args[0]
 	}
 
-	cmd_infos := fetch_cmd_info(filter)
+	cmd_infos, err := db_list_cmd(filter)
+	if err != nil {
+		return cli.error("unable to list cmd history")
+	}
+
 	selected_cmd := get_selected_cmd(cmd_infos)
 	fmt.println(selected_cmd)
 	return nil
@@ -78,38 +75,4 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 		}
 		tui.render_frame(&ui)
 	}
-
-}
-
-fetch_cmd_info :: proc(search_filter: string) -> []Command_Info {
-	search_term := "%"
-	max_limit := 50
-	if len(search_filter) > 0 {
-		search_term = strings.join([]string{"%", search_filter, "%"}, "")
-	}
-	query := "select cmd, exit_code, executed_at from cmd_history where cmd like ? order by executed_at desc limit ?"
-	stmt, err := sql.stmt_prepare(db, query, search_term, max_limit)
-	if err != nil {
-		return nil
-	}
-	defer sql.stmt_close(stmt)
-
-	command_infos := make([dynamic]Command_Info, context.temp_allocator)
-
-	for {
-		if !sql.row_next(stmt) {
-			break
-		}
-		cmd_info := Command_Info{}
-		sql.row_scan(
-			stmt,
-			context.temp_allocator,
-			&cmd_info.cmd,
-			&cmd_info.exit_code,
-			&cmd_info.executed_at,
-		)
-		append(&command_infos, cmd_info)
-	}
-
-	return command_infos[:]
 }

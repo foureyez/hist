@@ -1,13 +1,8 @@
 package main
 
-import "base:runtime"
 import "cli"
-import "core:c"
-import "core:fmt"
-import "core:log"
-import "core:strings"
+import "core:strconv"
 import "core:time"
-import sql "deps:sqlite3"
 
 
 add_cmd :: proc(args: []string) -> ^cli.Error {
@@ -16,21 +11,21 @@ add_cmd :: proc(args: []string) -> ^cli.Error {
 	}
 
 	cmd := args[0]
-	exit_code := args[1]
+	exit_code_str := args[1]
 
-	query := "insert into cmd_history(cmd, exit_code, executed_at) values(?, ?, ?)"
-	stmt, err := sql.stmt_prepare(db, query)
-	if err != nil {
-		log.errorf("unable to prepare stmt: %s", err)
-		return nil
+	exit_code, ok := strconv.parse_int(exit_code_str, 10)
+	if !ok {
+		return cli.error("exit code must be an integer")
 	}
-	defer sql.stmt_close(stmt)
 
-	affected, eerr := sql.stmt_exec(stmt, cmd, exit_code, time.now())
-	if err != nil {
-		log.errorf("unable to exec stmt: %s", err)
-		return nil
+	cmd_info := Command_Info {
+		cmd         = cmd,
+		exit_code   = exit_code,
+		executed_at = time.now(),
 	}
+
+	// Ignore error, nothing to do here
+	_ = db_save_cmd(cmd_info)
 
 	return nil
 }
