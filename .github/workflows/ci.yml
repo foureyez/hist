@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, fix/db-schema-ci ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    
+    - name: Install Odin (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        wget https://github.com/odin-lang/Odin/releases/download/dev-2024-01/odin-ubuntu-amd64-dev-2024-01.zip
+        unzip odin-ubuntu-amd64-dev-2024-01.zip
+        sudo mv odin /usr/local/
+        echo "/usr/local/odin" >> $GITHUB_PATH
+    
+    - name: Install Odin (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        wget https://github.com/odin-lang/Odin/releases/download/dev-2024-01/odin-macos-amd64-dev-2024-01.zip
+        unzip odin-macos-amd64-dev-2024-01.zip
+        sudo mv odin /usr/local/
+        echo "/usr/local/odin" >> $GITHUB_PATH
+    
+    - name: Verify Odin installation
+      run: |
+        odin version
+    
+    - name: Build debug
+      run: make build
+    
+    - name: Build release
+      run: make build-release
+    
+    - name: Run smoke tests
+      run: bash tests/smoke_test.sh
