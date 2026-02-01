@@ -4,18 +4,19 @@ set -e
 # Smoke test for cmdh
 # This script tests basic functionality of the cmdh binary
 
-# Set up temporary config directory
-export XDG_CONFIG_HOME="${GITHUB_WORKSPACE:-$(pwd)}/tmp_config"
-mkdir -p "$XDG_CONFIG_HOME"
+# Set up temporary home directory for testing
+TEST_HOME="${GITHUB_WORKSPACE:-$(pwd)}/tmp_config"
+mkdir -p "$TEST_HOME"
+export HOME="$TEST_HOME"
 
 # Clean up on exit
 cleanup() {
-    rm -rf "$XDG_CONFIG_HOME"
+    rm -rf "$TEST_HOME"
 }
 trap cleanup EXIT
 
 echo "=== Running cmdh smoke test ==="
-echo "Using config dir: $XDG_CONFIG_HOME"
+echo "Using test HOME: $TEST_HOME"
 
 # Find the binary
 if [ -f "./cmdh" ]; then
@@ -40,7 +41,7 @@ echo "Test 2: Add command"
 $CMDH add "echo hello" 0
 
 # Check that DB file was created
-DB_PATH="$XDG_CONFIG_HOME/.config/cmdh/sqlite.db"
+DB_PATH="$TEST_HOME/.config/cmdh/sqlite.db"
 if [ ! -f "$DB_PATH" ]; then
     echo "Error: Database file not created at $DB_PATH"
     exit 1
