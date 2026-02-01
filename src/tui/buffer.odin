@@ -6,7 +6,6 @@ import "core:math/rand"
 import "core:os"
 import "core:strings"
 
-alpha := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"}
 Cell :: struct {
 	char: rune,
 	fg:   Color,
@@ -55,7 +54,6 @@ draw_text :: proc(b: ^Buffer, x, y: int, text: string, fg: Color, bg: Color) {
 	}
 }
 
-// The "Render" pass
 render_buffer :: proc(ctx: ^Context) {
 	strings.builder_reset(&ctx.buffer_string)
 	cursor_x, cursor_y := -1, -1
@@ -70,7 +68,6 @@ render_buffer :: proc(ctx: ^Context) {
 
 		if cell != prev_cell {
 			if cursor_y != y || cursor_x != x {
-				// fmt.sbprintf(&ctx.buffer_string, "\x1b[%d;%dH", y + 1, x + 1)
 				move_cursor_sb(&ctx.buffer_string, x + 1, y + 1)
 				cursor_y = y
 				cursor_x = x
@@ -81,7 +78,7 @@ render_buffer :: proc(ctx: ^Context) {
 			ctx.back_buffer.cells[i] = ctx.buffer.cells[i]
 		}
 
-		// More optimized than calculating x and y at the start of the loop 
+		// Faster than calculating x and y at the start of the loop 
 		// x = i % ctx.buffer.width
 		// y = i / ctx.buffer.width
 		x += 1
@@ -95,17 +92,7 @@ render_buffer :: proc(ctx: ^Context) {
 }
 
 render_cell :: proc(sb: ^strings.Builder, cell: Cell) {
-	// fmt.sbprintf(
-	// 	sb,
-	// 	"\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%r\x1b[0m",
-	// 	cell.fg.r,
-	// 	cell.fg.g,
-	// 	cell.fg.b,
-	// 	cell.bg.r,
-	// 	cell.bg.g,
-	// 	cell.bg.b,
-	// 	cell.char,
-	// )
+	// Faster than fmt.sbprintf(sb,	"\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%r\x1b[0m",...)
 	strings.write_string(sb, "\x1b[;38;2;")
 	strings.write_int(sb, cell.fg.r)
 	strings.write_rune(sb, ';')

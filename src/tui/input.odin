@@ -32,7 +32,7 @@ Key_Type :: enum {
 	Right,
 }
 
-// Simple non-blocking key reader
+// Blocks until timeout has reached 
 read_key :: proc(fd: os.Handle, timeout_ms: int) -> Key {
 	if !has_input(fd, timeout_ms) {
 		return Key{.None, 0}

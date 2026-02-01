@@ -53,9 +53,10 @@ new :: proc(config_flags: Config_Flags = nil, output: os.Handle = os.stderr) -> 
 		buf = init_buffer(term_size.cols, term_size.rows)
 		back_buf = init_buffer(term_size.cols, term_size.rows)
 	} else {
-		// This is for starting drawing from the cursor position 
 		buf = init_buffer(term_size.cols, term_size.rows - cury)
 		back_buf = init_buffer(term_size.cols, term_size.rows - cury)
+
+		// This is for starting drawing from the cursor position 
 		// Start from top and put empty lines until the cursor y pos
 		move_cursor(output, 0, 0)
 		for i in 1 ..< cury {
