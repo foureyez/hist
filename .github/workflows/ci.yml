@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, copilot/** ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Odin (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        ODIN_VERSION="dev-2024-12"
+        wget -q https://github.com/odin-lang/Odin/releases/download/${ODIN_VERSION}/odin-ubuntu-amd64-${ODIN_VERSION}.zip
+        unzip -q odin-ubuntu-amd64-${ODIN_VERSION}.zip
+        sudo mv odin /usr/local/bin/
+        odin version
+    
+    - name: Install Odin (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        ODIN_VERSION="dev-2024-12"
+        wget -q https://github.com/odin-lang/Odin/releases/download/${ODIN_VERSION}/odin-macos-amd64-${ODIN_VERSION}.zip
+        unzip -q odin-macos-amd64-${ODIN_VERSION}.zip
+        sudo mv odin /usr/local/bin/
+        odin version
+    
+    - name: Build (debug)
+      run: make build
+    
+    - name: Build (release)
+      run: make build-release
+    
+    - name: Run smoke tests
+      run: |
+        export GITHUB_WORKSPACE="${PWD}"
+        bash tests/smoke_test.sh
