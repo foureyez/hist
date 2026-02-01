@@ -3,7 +3,7 @@ package sqlite3
 import "core:c"
 
 when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
-	foreign import sqlite {"lib/macos_arm64/libsqlite3.a", "system:pthread", "system:dl"}
+	foreign import sqlite {"lib/darwin_arm64/libsqlite3.a", "system:pthread", "system:dl"}
 } else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 	foreign import sqlite "lib/linux_x86_64/libsqlite3.a"
 }
