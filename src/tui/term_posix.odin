@@ -59,8 +59,11 @@ get_term_size :: proc(fd: i32) -> (TermSize, bool) {
 	ws := winsize{}
 
 	when ODIN_OS == .Darwin {
-		// res := darwin.syscall_ioctl(fd, darwin.TIOCGWINSZ, &ws)
-		res := 0  // Not implemented for Darwin in this build
+		// NOTE: Darwin support temporarily disabled due to Odin compiler issue.
+		// The compiler attempts to compile core:sys/darwin on Linux, causing errors.
+		// To restore: uncomment the darwin import at the top and this ioctl call.
+		// Original: res := darwin.syscall_ioctl(fd, darwin.TIOCGWINSZ, &ws)
+		res := 0  // Returns zero size - Darwin builds not currently supported
 	} else {
 		// TIOCGWINSZ is the magic number to request Window Size
 		// 1 is usually stdout (or os.stdout.handle)

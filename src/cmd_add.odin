@@ -25,6 +25,11 @@ add_cmd :: proc(args: []string) -> ^cli.Error {
 		return cli.error("exit_code must be a valid integer")
 	}
 
+	// Validate exit code range (Unix convention: 0-255)
+	if exit_code < 0 || exit_code > 255 {
+		return cli.error("exit_code must be between 0 and 255")
+	}
+
 	query := "insert into cmd_history(cmd, exit_code, executed_at) values(?, ?, ?)"
 	stmt, err := sql.stmt_prepare(db, query)
 	if err != nil {
