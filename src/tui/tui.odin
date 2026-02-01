@@ -38,9 +38,6 @@ Config_Flag :: enum {
 new :: proc(config_flags: Config_Flags = nil, output: os.Handle = os.stderr) -> Context {
 	enable_raw_mode()
 	curx, cury := get_cursor_pos(output)
-	log.info(curx, cury)
-
-
 	hide_cursor(output)
 
 	term_size, ok := get_term_size(i32(output))
@@ -86,7 +83,6 @@ new :: proc(config_flags: Config_Flags = nil, output: os.Handle = os.stderr) -> 
 cleanup :: proc(ctx: ^Context) {
 	// reset_cursor(ctx.output, ctx.buffer.height)
 	move_cursor(ctx.output, ctx.cursor_pos.x, ctx.cursor_pos.y - 1)
-	log.info("moved to: %v", ctx.cursor_pos)
 	show_cursor(ctx.output)
 	destroy_buffer(&ctx.buffer)
 	disable_raw_mode()
@@ -100,8 +96,12 @@ cleanup :: proc(ctx: ^Context) {
 
 poll_event :: proc(ctx: ^Context) -> Event {
 	clear_buffer(&ctx.buffer)
+	timeout := -1
+	if ctx.is_dirty == true {
+		timeout = 16
+	}
 
-	key := read_key(ctx.output)
+	key := read_key(ctx.output, timeout)
 	if key.type != .None {
 		ctx.is_dirty = true
 		return TypeEvent{key = key}
@@ -125,4 +125,8 @@ render_frame :: proc(ctx: ^Context) {
 		ctx.is_dirty = false
 	}
 	ctx.curr_line = 0
+}
+
+request_refresh :: proc(ctx: ^Context) {
+	ctx.is_dirty = true
 }

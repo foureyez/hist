@@ -47,7 +47,6 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 		cmds = cmd_infos,
 	}
 
-	printKey: rune
 	for {
 		event := tui.poll_event(&ui)
 
@@ -77,7 +76,6 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 				tui.write_string(&ui, c.cmd)
 			}
 		}
-
 		tui.render_frame(&ui)
 	}
 

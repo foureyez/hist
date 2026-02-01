@@ -33,8 +33,8 @@ Key_Type :: enum {
 }
 
 // Simple non-blocking key reader
-read_key :: proc(fd: os.Handle) -> Key {
-	if !has_input(fd, -1) {
+read_key :: proc(fd: os.Handle, timeout_ms: int) -> Key {
+	if !has_input(fd, timeout_ms) {
 		return Key{.None, 0}
 	}
 
@@ -59,7 +59,6 @@ read_key :: proc(fd: os.Handle) -> Key {
 		// Map 1->'a', 3->'c', etc. (ASCII 'a' starts at 97)
 		return Key{.Ctrl, rune('a' + (b - 1))}
 	case 27:
-		log.info("here")
 		return parse_escape_sequence(fd, b)
 	case:
 		return parse_utf8_sequence(fd, b)
