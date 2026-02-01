@@ -2,9 +2,11 @@ package tui
 
 import "core:fmt"
 import "core:log"
+import "core:math/rand"
 import "core:os"
 import "core:strings"
 
+alpha := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"}
 Cell :: struct {
 	char: rune,
 	fg:   Color,
@@ -55,36 +57,39 @@ draw_text :: proc(b: ^Buffer, x, y: int, text: string, fg: Color, bg: Color) {
 
 // The "Render" pass
 render_buffer :: proc(ctx: ^Context) {
-	sb: strings.Builder
-	strings.builder_init(&sb)
-	defer strings.builder_destroy(&sb)
+	strings.builder_reset(&ctx.buffer_string)
 
 	cursor_x, cursor_y := -1, -1
 
 	for i in 0 ..< len(ctx.buffer.cells) {
-		prev_cell := ctx.prev_buffer.cells[i]
+		prev_cell := ctx.back_buffer.cells[i]
 		cell := ctx.buffer.cells[i]
 		x := i % ctx.buffer.width
 		y := i / ctx.buffer.width
 
 
 		if cell == prev_cell {
-			// strings.write_rune(&sb, '.')
+			// strings.write_string(&sb, alpha[rand.int_max(len(alpha))])
 			continue
 		}
 
 		if cursor_y != y || cursor_x != x {
-			fmt.sbprintf(&sb, "\x1b[%d;%dH", y + 1, x + 1)
+			// fmt.sbprintf(&ctx.buffer_string, "\x1b[%d;%dH", y + 1, x + 1)
+			strings.write_string(&ctx.buffer_string, "\x1b[")
+			strings.write_int(&ctx.buffer_string, y + 1)
+			strings.write_string(&ctx.buffer_string, ";")
+			strings.write_int(&ctx.buffer_string, x + 1)
+			strings.write_byte(&ctx.buffer_string, 'H')
 			cursor_y = y
 			cursor_x = x
 		}
 
-		render_cell(&sb, cell)
+		render_cell(&ctx.buffer_string, cell)
 		cursor_x += 1
-		ctx.prev_buffer.cells[i] = ctx.buffer.cells[i]
+		ctx.back_buffer.cells[i] = ctx.buffer.cells[i]
 	}
 
-	fmt.fprintf(ctx.output, strings.to_string(sb))
+	os.write(ctx.output, ctx.buffer_string.buf[:])
 }
 
 render_cell :: proc(sb: ^strings.Builder, cell: Cell) {

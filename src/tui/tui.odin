@@ -2,16 +2,19 @@ package tui
 
 import "core:log"
 import "core:os"
+import "core:strings"
 import "core:unicode/utf8"
 
 Context :: struct {
-	config_flags: Config_Flags,
-	buffer:       Buffer,
-	prev_buffer:  Buffer,
-	curr_line:    int,
-	cursor_pos:   [2]int,
-	output:       os.Handle,
-	clear_init:   bool,
+	config_flags:  Config_Flags,
+	buffer:        Buffer,
+	back_buffer:   Buffer,
+	curr_line:     int,
+	cursor_pos:    [2]int,
+	output:        os.Handle,
+	clear_init:    bool,
+	buffer_string: strings.Builder,
+	is_dirty:      bool,
 }
 
 Event :: union {
@@ -51,7 +54,7 @@ new :: proc(config_flags: Config_Flags = nil, output: os.Handle = os.stderr) -> 
 	if .FULLSCREEN in config_flags {
 		enable_alt_buffer(output)
 		buf = init_buffer(term_size.cols, term_size.rows)
-		back_buf = init_buffer(term_size.cols, term_size.rows - cury)
+		back_buf = init_buffer(term_size.cols, term_size.rows)
 	} else {
 		// This is for starting drawing from the cursor position 
 		buf = init_buffer(term_size.cols, term_size.rows - cury)
@@ -65,12 +68,16 @@ new :: proc(config_flags: Config_Flags = nil, output: os.Handle = os.stderr) -> 
 		move_cursor(output, 0, cury)
 	}
 
+	buffer_string: strings.Builder
+	strings.builder_init(&buffer_string)
 	ctx := Context {
-		buffer       = buf,
-		prev_buffer  = back_buf,
-		config_flags = config_flags,
-		output       = output,
-		cursor_pos   = {curx, cury},
+		buffer        = buf,
+		back_buffer   = back_buf,
+		config_flags  = config_flags,
+		output        = output,
+		cursor_pos    = {curx, cury},
+		buffer_string = buffer_string,
+		is_dirty      = true,
 	}
 
 	return ctx
@@ -84,6 +91,8 @@ cleanup :: proc(ctx: ^Context) {
 	destroy_buffer(&ctx.buffer)
 	disable_raw_mode()
 
+	strings.builder_destroy(&ctx.buffer_string)
+
 	if .FULLSCREEN in ctx.config_flags {
 		disable_alt_buffer(ctx.output)
 	}
@@ -91,9 +100,10 @@ cleanup :: proc(ctx: ^Context) {
 
 poll_event :: proc(ctx: ^Context) -> Event {
 	clear_buffer(&ctx.buffer)
-	key := read_key(ctx.output)
 
+	key := read_key(ctx.output)
 	if key.type != .None {
+		ctx.is_dirty = true
 		return TypeEvent{key = key}
 	}
 
@@ -110,6 +120,9 @@ write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color =
 }
 
 render_frame :: proc(ctx: ^Context) {
-	render_buffer(ctx)
+	if ctx.is_dirty {
+		render_buffer(ctx)
+		ctx.is_dirty = false
+	}
 	ctx.curr_line = 0
 }

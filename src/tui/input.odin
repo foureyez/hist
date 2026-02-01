@@ -34,7 +34,7 @@ Key_Type :: enum {
 
 // Simple non-blocking key reader
 read_key :: proc(fd: os.Handle) -> Key {
-	if !has_input(fd) {
+	if !has_input(fd, -1) {
 		return Key{.None, 0}
 	}
 
@@ -74,9 +74,7 @@ parse_escape_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 	// Tiny sleep to allow sequence bytes to arrive in buffer
 	// TODO:: Need to see what to do here to remove.
 	// Second thread?
-	time.sleep(1 * time.Millisecond)
-
-	if !has_input(fd) {
+	if !has_input(fd, 1) {
 		return Key{type = .Esc}
 	}
 

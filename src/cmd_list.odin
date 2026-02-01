@@ -25,7 +25,6 @@ UI_Model :: struct {
 	selected: int,
 }
 
-// alpha := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"}
 list_cmd :: proc(args: []string) -> ^cli.Error {
 	defer free_all(context.temp_allocator)
 
@@ -80,14 +79,13 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 		}
 
 		tui.render_frame(&ui)
-		time.sleep(16 * time.Millisecond)
 	}
 
 }
 
 fetch_cmd_info :: proc(search_filter: string) -> []Command_Info {
 	search_term := "%"
-	max_limit := 10
+	max_limit := 50
 	if len(search_filter) > 0 {
 		search_term = strings.join([]string{"%", search_filter, "%"}, "")
 	}
