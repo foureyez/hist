@@ -41,6 +41,14 @@ move_cursor :: proc(fd: os.Handle, x, y: int) {
 	fmt.fprintf(fd, "\x1b[%d;%dH", y, x)
 }
 
+move_cursor_sb :: proc(sb: ^strings.Builder, x, y: int) {
+	strings.write_string(sb, "\x1b[")
+	strings.write_int(sb, y)
+	strings.write_string(sb, ";")
+	strings.write_int(sb, x)
+	strings.write_byte(sb, 'H')
+}
+
 save_cursor :: proc(fd: os.Handle) {
 	fmt.fprint(fd, "\x1b[s")
 }
