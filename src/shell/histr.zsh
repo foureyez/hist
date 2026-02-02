@@ -51,4 +51,4 @@ _histr_search() {
 add-zsh-hook preexec _histr_preexec
 add-zsh-hook precmd _histr_precmd
 
-zle -N histr-search __histr_search_cmd
+zle -N histr-search _histr_search
