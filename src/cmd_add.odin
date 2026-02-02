@@ -1,6 +1,7 @@
 package main
 
 import "cli"
+import "core:fmt"
 import "core:strconv"
 import "core:time"
 
@@ -11,13 +12,8 @@ add_start_cmd :: proc(args: []string) -> ^cli.Error {
 	}
 
 	cmd := args[0]
-	cmd_info := Command_Info {
-		cmd         = cmd,
-		executed_at = time.now(),
-	}
-
-	// Ignore error, nothing to do here
-	_ = db_save_cmd(cmd_info)
+	id, _ := db_add_cmd(cmd, time.now())
+	fmt.println(id)
 	return nil
 }
 

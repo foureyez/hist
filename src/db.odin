@@ -2,6 +2,7 @@ package main
 
 import "core:log"
 import "core:strings"
+import "core:time"
 import sql "deps:sqlite3"
 
 DB_Error :: union {
@@ -11,17 +12,16 @@ DB_Error :: union {
 SDB_Error :: enum {
 	PrepareStmtFailed,
 	ExecStmtFailed,
+	UnableToAddCmd,
 }
 
-// ensure_schema makes sure the cmd_history table exists.
-// Returns an sql.Error if something goes wrong.
 ensure_schema :: proc(db: ^sql.DB) -> sql.Error {
-	// Use a CREATE TABLE IF NOT EXISTS to be idempotent and safe on first-run.
 	create_table_sql :=
 		"CREATE TABLE IF NOT EXISTS cmd_history(" +
 		"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
 		"cmd TEXT NOT NULL, " +
 		"exit_code INTEGER, " +
+		"duration INTEGER, " +
 		"executed_at TEXT" +
 		");"
 
@@ -42,18 +42,42 @@ ensure_schema :: proc(db: ^sql.DB) -> sql.Error {
 	return nil
 }
 
-db_save_cmd :: proc(cmd_info: Command_Info) -> DB_Error {
-	query := "insert into cmd_history(cmd, exit_code, executed_at) values(?, ?, ?)"
-	stmt, err := sql.stmt_prepare(db, query)
+db_add_cmd :: proc(cmd: string, executed_at: time.Time) -> (i64, DB_Error) {
+	query := "insert into cmd_history(cmd, executed_at) values(?, ?) RETURNING id;"
+	stmt, err := sql.stmt_prepare(db, query, cmd, executed_at)
+	if err != nil {
+		return 0, .PrepareStmtFailed
+	}
+	defer sql.stmt_close(stmt)
+
+	if !sql.row_next(stmt) {
+		return 0, .UnableToAddCmd
+	}
+	id: i64
+	sql.row_scan(stmt, context.temp_allocator, &id)
+	return id, nil
+}
+
+db_update_cmd :: proc(id: i64) -> DB_Error {
+	query := "insert into cmd_history(cmd, exit_code, executed_at) values(?, ?, ?) RETURNING id;"
+	stmt, err := sql.stmt_prepare(
+		db,
+		query,
+		cmd_info.cmd,
+		cmd_info.exit_code,
+		cmd_info.executed_at,
+	)
 	if err != nil {
 		return .PrepareStmtFailed
 	}
 	defer sql.stmt_close(stmt)
 
-	affected, eerr := sql.stmt_exec(stmt, cmd_info.cmd, cmd_info.exit_code, cmd_info.executed_at)
-	if eerr != nil {
-		log.errorf("unable to exec stmt: %s", err)
-		return .ExecStmtFailed
+	for {
+		if !sql.row_next(stmt) {
+			break
+		}
+		id: i64
+		sql.row_scan(stmt, context.temp_allocator, &id)
 	}
 
 	return nil

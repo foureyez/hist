@@ -13,7 +13,7 @@ debug: build
 	$(MAKE) build 
 
 build: 
-	@echo "Building cmdd"
+	@echo "Building histr"
 	odin build ./src -out:histr -collection:deps=deps $(ODIN_BUILD_FLAGS)
 
 build-deps:
