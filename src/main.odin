@@ -9,9 +9,9 @@ import "core:path/filepath"
 import "db"
 
 dbh: ^db.DB
-APP_PATH :: ".config/histr"
-LOG_FILE_PATH :: APP_PATH + "/histr.log"
-DB_FILE_PATH :: APP_PATH + "/histr.db"
+APP_PATH :: ".config/hist"
+LOG_FILE_PATH :: APP_PATH + "/hist.log"
+DB_FILE_PATH :: APP_PATH + "/hist.db"
 
 main :: proc() {
 
@@ -69,7 +69,7 @@ main :: proc() {
 
 	cli.add_subcommand(app_cli, "add", "end", "end add a cli command to history", add_end_cmd)
 	cli.add_command(app_cli, "search", "search the stored cli commands", search_cmd)
-	cli.add_command(app_cli, "version", "prints the histr version", version_cmd)
+	cli.add_command(app_cli, "version", "prints the hist version", version_cmd)
 
 	free_all(context.temp_allocator)
 	cli.cli_run(app_cli)

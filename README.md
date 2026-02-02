@@ -1,4 +1,4 @@
-# histr
+# hist
 
 Command history tool written in Odin.
 

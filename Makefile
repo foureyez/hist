@@ -17,11 +17,11 @@ debug: build
 	$(MAKE) build 
 
 build: 
-	@echo "Building histr"
-	odin build ./src -out:histr -collection:deps=deps $(ODIN_BUILD_FLAGS)
+	@echo "Building hist"
+	odin build ./src -out:hist -collection:deps=deps $(ODIN_BUILD_FLAGS)
 
 build-deps:
 	./scripts/build_deps.sh $(DEPS_BUILD_MODE)
 
 run:
-	odin run ./src -out:histr -collection:deps=deps -o:speed -sanitize:address 
+	odin run ./src -out:hist -collection:deps=deps -o:speed -sanitize:address 

@@ -6,7 +6,7 @@ import "core:log"
 import "core:os"
 import "core:path/filepath"
 
-zsh_init := #load("./shell/histr.zsh")
+zsh_init := #load("./shell/hist.zsh")
 
 init_cmd :: proc(args: []string) -> ^cli.Error {
 	if len(args) == 0 {
@@ -23,7 +23,7 @@ init_cmd :: proc(args: []string) -> ^cli.Error {
 	switch shell {
 	case "zsh":
 		fmt.println(string(zsh_init))
-		fmt.println("bindkey -M emacs '^r' histr-search")
+		fmt.println("bindkey -M emacs '^r' hist-search")
 	case:
 		return cli.error("shell not supported")
 	}
