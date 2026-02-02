@@ -131,6 +131,9 @@ row_scan :: proc(stmt: ^Stmt, allocator: runtime.Allocator = context.allocator, 
 		case ^i64:
 			v := i64(sqlite.column_int64(stmt.handle, i32(i)))
 			val^ = v
+		case ^time.Duration:
+			v := i64(sqlite.column_int64(stmt.handle, i32(i)))
+			val^ = time.Duration(v)
 		case ^time.Time:
 			v := i64(sqlite.column_int64(stmt.handle, i32(i)))
 			val^ = time.from_nanoseconds(v)

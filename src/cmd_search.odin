@@ -3,6 +3,8 @@ package main
 import "base:runtime"
 import "cli"
 import "core:fmt"
+import "core:log"
+import "core:os"
 import "core:strings"
 import "core:time"
 import "tui"
@@ -10,6 +12,7 @@ import "tui"
 Command_Info :: struct {
 	cmd:         string,
 	exit_code:   int,
+	duration:    time.Duration,
 	executed_at: time.Time,
 }
 
@@ -21,31 +24,33 @@ UI_Model :: struct {
 search_cmd :: proc(args: []string) -> ^cli.Error {
 	defer free_all(context.temp_allocator)
 
-	filter := ""
-	if len(args) > 0 {
-		filter = args[0]
-	}
+	query := os.get_env("HISTR_QUERY")
+	log.infof("Query filter: %s", query)
 
-	cmd_infos, err := db_list_cmd(filter)
+	cmd_infos, err := db_list_cmd(query)
 	if err != nil {
 		return cli.error("unable to list cmd history")
 	}
 
 	selected_cmd := get_selected_cmd(cmd_infos)
-	fmt.println(selected_cmd)
+	fmt.print(selected_cmd)
 	return nil
 }
 
 get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
-	ui := tui.new({.FULLSCREEN})
-	defer tui.cleanup(&ui)
+	ui, err := tui.new_tui({.FULLSCREEN})
+	if err != nil {
+		return ""
+	}
+
+	defer tui.cleanup(ui)
 	query: strings.Builder
 	ui_model := UI_Model {
 		cmds = cmd_infos,
 	}
 
 	for {
-		event := tui.poll_event(&ui)
+		event := tui.poll_event(ui)
 
 		#partial switch e in event {
 		case tui.TypeEvent:
@@ -68,11 +73,19 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 
 		for c, i in ui_model.cmds {
 			if i == ui_model.selected {
-				tui.write_string(&ui, c.cmd, tui.Grey)
+				tui.write_string(
+					ui,
+					fmt.tprintf("%s:%d:%s:%s", c.cmd, c.exit_code, c.executed_at, c.duration),
+					tui.Grey,
+				)
 			} else {
-				tui.write_string(&ui, c.cmd)
+				tui.write_string(
+					ui,
+					fmt.tprintf("%s:%d:%s:%s", c.cmd, c.exit_code, c.executed_at, c.duration),
+				)
+
 			}
 		}
-		tui.render_frame(&ui)
+		tui.render_frame(ui)
 	}
 }

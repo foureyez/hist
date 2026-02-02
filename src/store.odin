@@ -73,7 +73,7 @@ db_list_cmd :: proc(cmd_filter: string) -> ([]Command_Info, Error) {
 		search_term = strings.join([]string{"%", cmd_filter, "%"}, "")
 	}
 
-	query := "select cmd, exit_code, executed_at from cmd_history where cmd like ? order by executed_at desc limit ?"
+	query := "select cmd, exit_code, duration, executed_at from cmd_history where cmd like ? order by executed_at desc limit ?"
 	stmt, err := db.stmt_prepare(dbh, query, search_term, max_limit)
 	if err != nil {
 		return nil, .PrepareStmtFailed
@@ -92,6 +92,7 @@ db_list_cmd :: proc(cmd_filter: string) -> ([]Command_Info, Error) {
 			context.temp_allocator,
 			&cmd_info.cmd,
 			&cmd_info.exit_code,
+			&cmd_info.duration,
 			&cmd_info.executed_at,
 		)
 		append(&command_infos, cmd_info)
