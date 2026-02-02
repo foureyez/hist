@@ -3,9 +3,13 @@
 ODIN_BUILD_FLAGS := -debug
 DEPS_BUILD_MODE := debug
 
-release: 
+release-all: 
 	@echo "Building in RELEASE mode..."
 	$(MAKE) build-deps DEPS_BUILD_MODE="RELEASE"
+	$(MAKE) build ODIN_BUILD_FLAGS="-o:speed -no-bounds-check -disable-assert" 
+
+release: 
+	@echo "Building in RELEASE mode..."
 	$(MAKE) build ODIN_BUILD_FLAGS="-o:speed -no-bounds-check -disable-assert" 
 
 debug: build
