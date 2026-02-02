@@ -14,6 +14,7 @@ init_cmd :: proc(args: []string) -> ^cli.Error {
 	}
 
 	// Ensure DB schema exists (creates cmd_history table if missing)
+	enable_db_flags(dbh)
 	schema_err := ensure_schema(dbh)
 	if schema_err != nil {
 		log.fatalf("Failed to initialize database schema: %s", schema_err)

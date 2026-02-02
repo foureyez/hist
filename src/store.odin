@@ -9,7 +9,6 @@ import "db"
 
 ensure_schema :: proc(dbh: ^db.DB) -> db.Error {
 	create_table_query := `
-  PRAGMA journal_mode=WAL;
   CREATE TABLE IF NOT EXISTS cmd_history (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
 		cmd TEXT NOT NULL, 
@@ -35,6 +34,22 @@ ensure_schema :: proc(dbh: ^db.DB) -> db.Error {
 
 	log.info("Database schema ensured")
 	return nil
+}
+
+enable_db_flags :: proc(dbh: ^db.DB) {
+	query := "PRAGMA journal_mode = WAL;"
+
+	stmt, err := db.stmt_prepare(dbh, query)
+	if err != nil {
+		log.errorf("schema: prepare failed: %s", err)
+		return
+	}
+	defer db.stmt_close(stmt)
+
+	_, exec_err := db.stmt_exec(stmt)
+	if exec_err != nil {
+		log.errorf("schema: exec failed: %s", exec_err)
+	}
 }
 
 db_add_cmd :: proc(cmd: string, executed_at: time.Time) -> (i64, Error) {
