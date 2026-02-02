@@ -1,10 +1,7 @@
 package tui
 
-import "core:fmt"
 import "core:log"
 import "core:os"
-import "core:sys/posix"
-import "core:time"
 import "core:unicode/utf8"
 
 Key :: struct {
@@ -32,7 +29,7 @@ Key_Type :: enum {
 	Right,
 }
 
-// Simple non-blocking key reader
+// Blocks until timeout has reached
 read_key :: proc(fd: os.Handle, timeout_ms: int) -> Key {
 	if !has_input(fd, timeout_ms) {
 		return Key{.None, 0}
@@ -146,6 +143,7 @@ parse_escape_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 
 parse_utf8_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 	buf: [4]byte
+	buf[0] = b
 	// Handle Regular utf8 input
 	// Check how many total bytes this rune SHOULD have
 	// utf8.rune_size returns 1, 2, 3, or 4 based on the header byte
@@ -163,6 +161,9 @@ parse_utf8_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 		}
 	}
 	r, _ := utf8.decode_rune(buf[:total_width])
+	if r == utf8.RUNE_ERROR {
+		return Key{type = .None}
+	}
 	return Key{type = .Char, char = r}
 
 }

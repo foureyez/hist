@@ -1,36 +1,34 @@
 package main
 
-import "base:runtime"
 import "cli"
-import "core:c"
 import "core:fmt"
-import "core:log"
-import "core:strings"
+import "core:strconv"
 import "core:time"
-import sql "deps:sqlite3"
 
 
-add_cmd :: proc(args: []string) -> ^cli.Error {
-	if len(args) < 2 {
-		return cli.error("'cmd' and 'exit code' required")
+add_start_cmd :: proc(args: []string) -> ^cli.Error {
+	if len(args) < 1 {
+		return cli.error("'cmd' required")
 	}
 
 	cmd := args[0]
-	exit_code := args[1]
+	id, _ := db_add_cmd(cmd, time.now())
+	fmt.println(id)
+	return nil
+}
 
-	query := "insert into cmd_history(cmd, exit_code, executed_at) values(?, ?, ?)"
-	stmt, err := sql.stmt_prepare(db, query)
-	if err != nil {
-		log.errorf("unable to prepare stmt: %s", err)
-		return nil
-	}
-	defer sql.stmt_close(stmt)
-
-	affected, eerr := sql.stmt_exec(stmt, cmd, exit_code, time.now())
-	if err != nil {
-		log.errorf("unable to exec stmt: %s", err)
-		return nil
+add_end_cmd :: proc(args: []string) -> ^cli.Error {
+	if len(args) < 3 {
+		return cli.error("'id', 'exit_code', 'duration' required")
 	}
 
+	id_str := args[0]
+	exit_code_str := args[1]
+	duration_str := args[2]
+
+	id, _ := strconv.parse_i64_of_base(id_str, 10)
+	exit_code, _ := strconv.parse_int(exit_code_str, 10)
+	duration_ns, _ := strconv.parse_i64_of_base(duration_str, 10)
+	db_update_cmd(id, exit_code, duration_ns)
 	return nil
 }

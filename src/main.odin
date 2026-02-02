@@ -1,18 +1,17 @@
 package main
 
 import "./cli"
-import "core:fmt"
 import "core:log"
 import "core:mem"
 import oso "core:os"
 import os "core:os/os2"
 import "core:path/filepath"
-import sql "deps:sqlite3"
+import "db"
 
-db: ^sql.DB
-APP_PATH :: ".config/cmdh"
-LOG_FILE_PATH :: APP_PATH + "/cmdh.log"
-DB_FILE_PATH :: APP_PATH + "/sqlite.db"
+dbh: ^db.DB
+APP_PATH :: ".config/histr"
+LOG_FILE_PATH :: APP_PATH + "/histr.log"
+DB_FILE_PATH :: APP_PATH + "/histr.db"
 
 main :: proc() {
 
@@ -27,19 +26,19 @@ main :: proc() {
 		level = .Error
 	}
 
-
 	home_dir_path, err := os.user_home_dir(context.temp_allocator)
 	if err != nil {
 		panic("Unable to get home dir")
 	}
 
 	app_path := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
-	os.mkdir_all(app_path)
+	os.mkdir(app_path)
 
 	log_path := filepath.join([]string{home_dir_path, LOG_FILE_PATH}, context.temp_allocator)
 	mode := oso.O_WRONLY | oso.O_CREATE | oso.O_APPEND
-	log_file, lerr := oso.open(log_path, mode)
-	if err != nil {
+	perm := 0o700
+	log_file, lerr := oso.open(log_path, mode, perm)
+	if lerr != nil {
 		panic("Unable to open log file")
 	}
 
@@ -48,21 +47,29 @@ main :: proc() {
 	context.logger = cl
 
 	db_path := filepath.join([]string{home_dir_path, DB_FILE_PATH}, context.temp_allocator)
-
-
-	derr: sql.Error
-	db, derr = sql.db_open(db_path)
-	if err != nil {
+	derr: db.Error
+	dbh, derr = db.db_open(db_path)
+	if derr != nil {
 		log.fatalf("Unable to open db: %s", err)
 	}
-	defer sql.db_close(db)
+	defer db.db_close(dbh)
 
 	app_cli := cli.create(context.allocator)
 	defer cli.destroy(app_cli)
 
-	cli.add_command(app_cli, "add", "stores the cli command", add_cmd)
-	cli.add_command(app_cli, "list", "lists the stored cli commands", list_cmd)
-	cli.add_command(app_cli, "version", "prints the cmdh version", version_cmd)
+	cli.add_command(app_cli, "init", "prints the shell script to initialize cmdd", init_cmd)
+	cli.add_command(app_cli, "add", "add a cli command to history", nil)
+	cli.add_subcommand(
+		app_cli,
+		"add",
+		"start",
+		"start add a cli command to history",
+		add_start_cmd,
+	)
+
+	cli.add_subcommand(app_cli, "add", "end", "end add a cli command to history", add_end_cmd)
+	cli.add_command(app_cli, "search", "search the stored cli commands", search_cmd)
+	cli.add_command(app_cli, "version", "prints the histr version", version_cmd)
 
 	free_all(context.temp_allocator)
 	cli.cli_run(app_cli)

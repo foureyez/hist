@@ -1,8 +1,27 @@
-build:
-	odin build ./src -out:cmdh -collection:deps=deps -debug
+.PHONY: build
 
-build-release:
-	odin build ./src -out:cmdh -collection:deps=deps -o:speed -no-bounds-check -disable-assert
+ODIN_BUILD_FLAGS := -debug
+DEPS_BUILD_MODE := debug
+
+release-all: 
+	@echo "Building in RELEASE mode..."
+	$(MAKE) build-deps DEPS_BUILD_MODE="RELEASE"
+	$(MAKE) build ODIN_BUILD_FLAGS="-o:speed -no-bounds-check -disable-assert" 
+
+release: 
+	@echo "Building in RELEASE mode..."
+	$(MAKE) build ODIN_BUILD_FLAGS="-o:speed -no-bounds-check -disable-assert" 
+
+debug: build
+	@echo "Building in DEBUG mode..."
+	$(MAKE) build 
+
+build: 
+	@echo "Building histr"
+	odin build ./src -out:histr -collection:deps=deps $(ODIN_BUILD_FLAGS)
+
+build-deps:
+	./scripts/build_deps.sh $(DEPS_BUILD_MODE)
 
 run:
-	odin run ./src -out:cmdh -collection:deps=deps -o:speed -sanitize:address 
+	odin run ./src -out:histr -collection:deps=deps -o:speed -sanitize:address 

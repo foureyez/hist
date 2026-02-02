@@ -1,11 +1,9 @@
-#+build linux, darwin
+#+build  darwin
 package tui
 
 import "core:os"
 import "core:sys/darwin"
-import "core:sys/linux"
 import "core:sys/posix"
-import "core:sys/unix"
 
 // Store the original settings to restore them when the app exits
 @(private)
@@ -57,16 +55,7 @@ get_term_size :: proc(fd: i32) -> (TermSize, bool) {
 	}
 
 	ws := winsize{}
-
-	when ODIN_OS == .Darwin {
-		res := darwin.syscall_ioctl(fd, darwin.TIOCGWINSZ, &ws)
-	} else {
-		// TIOCGWINSZ is the magic number to request Window Size
-		// 1 is usually stdout (or os.stdout.handle)
-		res := linux.ioctl(fd, linux.TIOCGWINSZ, &ws)
-	}
-
-
+	res := darwin.syscall_ioctl(fd, darwin.TIOCGWINSZ, &ws)
 	if res != 0 {
 		return TermSize{0, 0}, false
 	}
