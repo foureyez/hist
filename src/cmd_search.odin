@@ -25,31 +25,37 @@ search_cmd :: proc(args: []string) -> ^cli.Error {
 	defer free_all(context.temp_allocator)
 
 	query := os.get_env("HISTR_QUERY")
-	log.infof("Query filter: %s", query)
-
-	cmd_infos, err := db_list_cmd(query)
-	if err != nil {
-		return cli.error("unable to list cmd history")
-	}
-
-	selected_cmd := get_selected_cmd(cmd_infos)
+	selected_cmd := get_selected_cmd(query)
 	fmt.print(selected_cmd)
 	return nil
 }
 
-get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
-	ui, err := tui.new_tui({.FULLSCREEN})
+get_selected_cmd :: proc(start_query: string) -> string {
+	ui, terr := tui.new_tui({.FULLSCREEN})
+	if terr != nil {
+		return ""
+	}
+	defer tui.cleanup(ui)
+
+	query: strings.Builder
+	strings.write_string(&query, start_query)
+
+	limit := 50
+	ui_model := UI_Model{}
+	query_stmt, err := db_prepare_list_stmt()
 	if err != nil {
+		log.errorf("Unable to prepare stmt for list cmd: %s", err)
+		return ""
+	}
+	defer db_close_list_stmt(query_stmt)
+
+	ui_model.cmds, err = db_list_cmd(query_stmt, strings.to_string(query), limit)
+	if err != nil {
+		log.errorf("Unable to list cmd: %s", err)
 		return ""
 	}
 
-	defer tui.cleanup(ui)
-	query: strings.Builder
-	ui_model := UI_Model {
-		cmds = cmd_infos,
-	}
-
-	cmd_infos := cmd_infos
+	// ui_model.cmds, _ = db_list_cmd(strings.to_string(query), limit)
 
 	for {
 		event := tui.poll_event(ui)
@@ -59,9 +65,10 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 			#partial switch e.key.type {
 			case .Char:
 				strings.write_rune(&query, e.key.char)
-				ui_model.cmds, _ = db_list_cmd(strings.to_string(query))
+				ui_model.cmds, _ = db_list_cmd(query_stmt, strings.to_string(query), limit)
 			case .Backspace:
 				strings.pop_rune(&query)
+				ui_model.cmds, _ = db_list_cmd(query_stmt, strings.to_string(query), limit)
 			case .Up:
 				ui_model.selected = max(ui_model.selected - 1, 0)
 			case .Down:
@@ -81,16 +88,9 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 		tui.write_string(ui, fmt.tprintf("> %s", strings.to_string(query)))
 		for c, i in ui_model.cmds {
 			if i == ui_model.selected {
-				tui.write_string(
-					ui,
-					fmt.tprintf("%s:%d:%s:%s", c.cmd, c.exit_code, c.executed_at, c.duration),
-					tui.Grey,
-				)
+				tui.write_string(ui, fmt.tprintf("%s", c.cmd), tui.Grey)
 			} else {
-				tui.write_string(
-					ui,
-					fmt.tprintf("%s:%d:%s:%s", c.cmd, c.exit_code, c.executed_at, c.duration),
-				)
+				tui.write_string(ui, fmt.tprintf("%s", c.cmd))
 
 			}
 		}

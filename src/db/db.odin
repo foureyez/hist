@@ -56,37 +56,41 @@ stmt_prepare :: proc(db: ^DB, query: string, args: ..any) -> (^Stmt, Error) {
 		return nil, .PrepareStmtFailed
 	}
 
-	if err := stmt_bind(sql_stmt, ..args); err != nil {
+	stmt := new(Stmt)
+	stmt.handle = sql_stmt
+
+	if err := stmt_bind(stmt, ..args); err != nil {
 		return nil, err
 	}
 
-	raw_query := sqlite.expanded_sql(sql_stmt)
+	// raw_query := sqlite.expanded_sql(sql_stmt)
 	// defer sqlite.free(&raw_query)
-	log.debugf("Prepared sql query: %s", raw_query)
-	stmt := new(Stmt)
-	stmt.handle = sql_stmt
+	// log.debugf("Prepared sql query: %s", raw_query)
 	return stmt, nil
 }
 
-@(private = "file")
-stmt_bind :: proc(stmt: ^sqlite.sqlite3_stmt, args: ..any) -> Error {
+stmt_bind :: proc(stmt: ^Stmt, args: ..any) -> Error {
 	for arg, i in args {
 		rc: sqlite.ResultCode
 		switch value in arg {
 		case string:
 			cval := strings.clone_to_cstring(value)
-			rc = sqlite.bind_text(stmt, i32(i) + 1, cval, -1, sqlite.TRANSIENT)
+			rc = sqlite.bind_text(stmt.handle, i32(i) + 1, cval, -1, sqlite.TRANSIENT)
 			delete(cval)
 		case int:
-			rc = sqlite.bind_int(stmt, i32(i) + 1, c.int(value))
+			rc = sqlite.bind_int(stmt.handle, i32(i) + 1, c.int(value))
 		case i64:
-			rc = sqlite.bind_int64(stmt, i32(i) + 1, i64(value))
+			rc = sqlite.bind_int64(stmt.handle, i32(i) + 1, i64(value))
 		case time.Time:
-			rc = sqlite.bind_int64(stmt, i32(i) + 1, c.int64_t(time.to_unix_nanoseconds(value)))
+			rc = sqlite.bind_int64(
+				stmt.handle,
+				i32(i) + 1,
+				c.int64_t(time.to_unix_nanoseconds(value)),
+			)
 		}
 
 		if rc != .OK {
-			log.errorf("unable to prepare stmt: %s", sqlite.errmsg(sqlite.db_handle(stmt)))
+			log.errorf("unable to prepare stmt: %s", sqlite.errmsg(sqlite.db_handle(stmt.handle)))
 			return .BindPrepareStmtFailed
 		}
 	}
@@ -96,7 +100,7 @@ stmt_bind :: proc(stmt: ^sqlite.sqlite3_stmt, args: ..any) -> Error {
 
 
 stmt_exec :: proc(stmt: ^Stmt, args: ..any) -> (i64, Error) {
-	if err := stmt_bind(stmt.handle, ..args); err != nil {
+	if err := stmt_bind(stmt, ..args); err != nil {
 		return 0, err
 	}
 
@@ -107,6 +111,10 @@ stmt_exec :: proc(stmt: ^Stmt, args: ..any) -> (i64, Error) {
 	}
 	log.errorf("unable to exec stmt: %s", sqlite.errmsg(sqlite.db_handle(stmt.handle)))
 	return 0, .PrepareStmtExecFailed
+}
+
+stmt_reset :: proc(stmt: ^Stmt) {
+	sqlite.reset(stmt.handle)
 }
 
 stmt_close :: proc(stmt: ^Stmt) {

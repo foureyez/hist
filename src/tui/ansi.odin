@@ -7,10 +7,14 @@ import "core:strings"
 
 // Define colors
 Color :: struct {
-	r, g, b: int,
+	r, g, b: i16,
 }
 
-None :: Color{}
+NoColor :: Color {
+	r = -1,
+	g = -1,
+	b = -1,
+}
 
 Black :: Color {
 	r = 0,

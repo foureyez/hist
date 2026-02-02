@@ -130,7 +130,7 @@ raw_draw :: proc(ctx: ^Context, x, y: int, text: string, fg: Color, bg: Color) {
 	draw_text(&ctx.buffer, x, y, text, fg, bg)
 }
 
-write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color = Black) {
+write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color = NoColor) {
 	draw_text(&ctx.buffer, 0, ctx.curr_line, text, fg, bg)
 	ctx.curr_line += 1
 }

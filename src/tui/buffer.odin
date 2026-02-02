@@ -32,7 +32,7 @@ clear_buffer :: proc(b: ^Buffer) {
 	for i in 0 ..< len(b.cells) {
 		b.cells[i] = Cell {
 			char = ' ',
-			fg   = None,
+			fg   = NoColor,
 		}
 	}
 }
@@ -90,23 +90,24 @@ render_buffer :: proc(ctx: ^Context) {
 
 render_cell :: proc(sb: ^strings.Builder, cell: Cell) {
 	// Faster than fmt.sbprintf(sb,	"\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%r\x1b[0m",...)
-	strings.write_string(sb, "\x1b[;38;2;")
-	strings.write_int(sb, cell.fg.r)
+	strings.write_string(sb, "\x1b[38;2;")
+
+	strings.write_int(sb, int(cell.fg.r))
 	strings.write_rune(sb, ';')
-	strings.write_int(sb, cell.fg.g)
+	strings.write_int(sb, int(cell.fg.g))
 	strings.write_rune(sb, ';')
-	strings.write_int(sb, cell.fg.b)
+	strings.write_int(sb, int(cell.fg.b))
 	strings.write_rune(sb, ';')
 
-	strings.write_string(sb, "48;2;")
 
-	strings.write_int(sb, cell.bg.r)
-	strings.write_rune(sb, ';')
-	strings.write_int(sb, cell.bg.g)
-	strings.write_rune(sb, ';')
-	strings.write_int(sb, cell.bg.b)
-	strings.write_rune(sb, 'm')
-
+	if cell.bg != NoColor {
+		strings.write_string(sb, ";48;2;") // Leading semicolon joins FG and BG
+		strings.write_int(sb, int(cell.bg.r))
+		strings.write_byte(sb, ';')
+		strings.write_int(sb, int(cell.bg.g))
+		strings.write_byte(sb, ';')
+		strings.write_int(sb, int(cell.bg.b))
+	}
+	strings.write_byte(sb, 'm')
 	strings.write_rune(sb, cell.char)
-	strings.write_string(sb, "\x1b[0m")
 }
