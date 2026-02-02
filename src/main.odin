@@ -26,13 +26,13 @@ main :: proc() {
 		level = .Error
 	}
 
-
 	home_dir_path, err := os.user_home_dir(context.temp_allocator)
 	if err != nil {
 		panic("Unable to get home dir")
 	}
 
 	app_path := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
+	os.mkdir(app_path)
 
 	log_path := filepath.join([]string{home_dir_path, LOG_FILE_PATH}, context.temp_allocator)
 	mode := oso.O_WRONLY | oso.O_CREATE | oso.O_APPEND
