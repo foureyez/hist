@@ -21,7 +21,7 @@ _histr_precmd() {
         printf -v duration %.0f $(((__histr_precmd_time - __histr_preexec_time) * 1000000000))
     fi
 
-    (histr_LOG=error histr add end $histr_HISTORY_ID $EXIT ${duration:+--duration=$duration}  &) >/dev/null 2>&1
+    (histr add end $histr_HISTORY_ID $EXIT $duration &) >/dev/null 2>&1
     export histr_HISTORY_ID=""
 }
 

@@ -18,15 +18,17 @@ add_start_cmd :: proc(args: []string) -> ^cli.Error {
 }
 
 add_end_cmd :: proc(args: []string) -> ^cli.Error {
-	if len(args) < 1 {
-		return cli.error("'exit_code' required")
+	if len(args) < 3 {
+		return cli.error("'id', 'exit_code', 'duration' required")
 	}
 
-	exit_code_str := args[0]
-	exit_code, ok := strconv.parse_int(exit_code_str, 10)
-	if !ok {
-		return cli.error("exit code must be an integer")
-	}
+	id_str := args[0]
+	exit_code_str := args[1]
+	duration_str := args[2]
 
+	id, _ := strconv.parse_i64_of_base(id_str, 10)
+	exit_code, _ := strconv.parse_int(exit_code_str, 10)
+	duration_ns, _ := strconv.parse_i64_of_base(duration_str, 10)
+	db_update_cmd(id, exit_code, duration_ns)
 	return nil
 }

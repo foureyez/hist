@@ -6,9 +6,9 @@ import "core:mem"
 import oso "core:os"
 import os "core:os/os2"
 import "core:path/filepath"
-import sql "deps:sqlite3"
+import "db"
 
-db: ^sql.DB
+dbh: ^db.DB
 APP_PATH :: ".config/histr"
 LOG_FILE_PATH :: APP_PATH + "/histr.log"
 DB_FILE_PATH :: APP_PATH + "/histr.db"
@@ -33,7 +33,6 @@ main :: proc() {
 	}
 
 	app_path := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
-	os.mkdir_all(app_path)
 
 	log_path := filepath.join([]string{home_dir_path, LOG_FILE_PATH}, context.temp_allocator)
 	mode := oso.O_WRONLY | oso.O_CREATE | oso.O_APPEND
@@ -48,20 +47,12 @@ main :: proc() {
 	context.logger = cl
 
 	db_path := filepath.join([]string{home_dir_path, DB_FILE_PATH}, context.temp_allocator)
-
-
-	derr: sql.Error
-	db, derr = sql.db_open(db_path)
+	derr: db.Error
+	dbh, derr = db.db_open(db_path)
 	if derr != nil {
 		log.fatalf("Unable to open db: %s", err)
 	}
-	defer sql.db_close(db)
-
-	// Ensure DB schema exists (creates cmd_history table if missing)
-	schema_err := ensure_schema(db)
-	if schema_err != nil {
-		log.fatalf("Failed to initialize database schema: %s", schema_err)
-	}
+	defer db.db_close(dbh)
 
 	app_cli := cli.create(context.allocator)
 	defer cli.destroy(app_cli)

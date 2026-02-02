@@ -1,130 +1,54 @@
 package sqlite3
 
-import "base:runtime"
 import "core:c"
-import "core:log"
-import "core:strings"
-import "core:time"
 
-DB :: struct {
-	handle: ^sqlite3,
+when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
+	foreign import sqlite {"lib/darwin_arm64/libsqlite3.a", "system:pthread", "system:dl"}
+} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
+	foreign import sqlite "lib/linux_x86_64/libsqlite3.a"
 }
 
-Stmt :: struct {
-	handle: ^sqlite3_stmt,
+sqlite3 :: rawptr
+sqlite3_stmt :: rawptr
+
+
+@(default_calling_convention = "c", link_prefix = "sqlite3_")
+foreign sqlite {
+	config :: proc(flag: ..c.int) -> ResultCode ---
+	open :: proc(path: cstring, db: ^^sqlite3) -> ResultCode ---
+	close :: proc(db: ^sqlite3) -> ResultCode ---
+	errmsg :: proc(db: ^sqlite3) -> cstring ---
+	prepare_v3 :: proc(db: ^sqlite3, stmt: cstring, nByte: c.int, prepFlags: c.uint, ppStmt: ^^sqlite3_stmt, pzTail: ^cstring) -> ResultCode ---
+	bind_text :: proc(stmt: ^sqlite3_stmt, _: c.int, _: cstring, _: c.int, lifetime: uintptr) -> ResultCode ---
+	bind_int :: proc(stmt: ^sqlite3_stmt, _: c.int, _: c.int) -> ResultCode ---
+	bind_int64 :: proc(stmt: ^sqlite3_stmt, _: c.int, _: c.int64_t) -> ResultCode ---
+	step :: proc(stmt: ^sqlite3_stmt) -> ResultCode ---
+	reset :: proc(stmt: ^sqlite3_stmt) -> ResultCode ---
+	changes64 :: proc(stmt: ^sqlite3) -> i64 ---
+	db_handle :: proc(stmt: ^sqlite3_stmt) -> ^sqlite3 ---
+
+
+	column_int :: proc(stmt: ^sqlite3_stmt, i_col: c.int) -> c.int ---
+	column_int64 :: proc(stmt: ^sqlite3_stmt, i_col: c.int) -> c.int64_t ---
+	column_text :: proc(stmt: ^sqlite3_stmt, i_col: c.int) -> cstring ---
+	column_double :: proc(stmt: ^sqlite3_stmt, i_col: c.int) -> c.double ---
+
+	expanded_sql :: proc(stmt: ^sqlite3_stmt) -> cstring ---
+	finalize :: proc(stmt: ^sqlite3_stmt) -> ResultCode ---
+	free :: proc(val: rawptr) ---
 }
 
-db_open :: proc(path: string) -> (^DB, Error) {
-	cpath := strings.clone_to_cstring(path)
-	defer delete(cpath)
-	sql_db: ^sqlite3
-	if rc := open(cpath, &sql_db); rc != .OK {
-		if sql_db != nil {
-			close(sql_db)
-		}
-		return nil, .DBOpenFailed
-	}
+STATIC :: uintptr(0)
+TRANSIENT :: ~uintptr(0)
 
-	db := new(DB)
-	db.handle = sql_db
-	return db, nil
+
+ResultCode :: enum c.int {
+	OK         = 0,
+	CONSTRAINT = 19,
+	ROW        = 100,
+	DONE       = 101,
 }
 
-db_close :: proc(db: ^DB) {
-	if db == nil {
-		return
-	}
-	close(db.handle)
-	free(db)
-}
-
-
-stmt_prepare :: proc(db: ^DB, query: string, args: ..any) -> (^Stmt, Error) {
-	cquery := strings.clone_to_cstring(query)
-	defer delete(cquery)
-	sql_stmt: ^sqlite3_stmt
-	if rc := prepare_v3(db.handle, cquery, -1, 0, &sql_stmt, nil); rc != .OK {
-		log.errorf("unable to prepare stmt: %s", errmsg(db.handle))
-		return nil, .PrepareStmtFailed
-	}
-
-	if err := stmt_bind(sql_stmt, ..args); err != nil {
-		return nil, err
-	}
-
-	stmt := new(Stmt)
-	stmt.handle = sql_stmt
-	return stmt, nil
-}
-
-@(private = "file")
-stmt_bind :: proc(stmt: ^sqlite3_stmt, args: ..any) -> Error {
-	for arg, i in args {
-		rc: ResultCode
-		switch value in arg {
-		case string:
-			cval := strings.clone_to_cstring(value)
-			rc = bind_text(stmt, i32(i) + 1, cval, -1, TRANSIENT)
-			delete(cval)
-		case int:
-			rc = bind_int(stmt, i32(i) + 1, c.int(value))
-		case time.Time:
-			rc = bind_int64(stmt, i32(i) + 1, c.int64_t(time.to_unix_nanoseconds(value)))
-		}
-
-		if rc != .OK {
-			log.errorf("unable to prepare stmt: %s", errmsg(db_handle(stmt)))
-			return .BindPrepareStmtFailed
-		}
-	}
-
-	return nil
-}
-
-
-stmt_exec :: proc(stmt: ^Stmt, args: ..any) -> (i64, Error) {
-	if err := stmt_bind(stmt.handle, ..args); err != nil {
-		return 0, err
-	}
-
-	if rc := step(stmt.handle); rc == .DONE {
-		rows_modified := changes64(db_handle(stmt.handle))
-		reset(stmt.handle)
-		return rows_modified, nil
-	}
-	log.errorf("unable to exec stmt: %s", errmsg(db_handle(stmt.handle)))
-	return 0, .PrepareStmtExecFailed
-}
-
-stmt_close :: proc(stmt: ^Stmt) {
-	finalize(stmt.handle)
-	free(stmt)
-}
-
-row_next :: proc(stmt: ^Stmt) -> bool {
-	rc := step(stmt.handle)
-	return rc == .ROW
-}
-
-row_scan :: proc(stmt: ^Stmt, allocator: runtime.Allocator = context.allocator, dest: ..any) {
-	for d, i in dest {
-		switch &val in d {
-		case ^string:
-			c_str := column_text(stmt.handle, i32(i))
-			val^ = strings.clone_from_cstring(c_str, allocator)
-		case ^int:
-			v := int(column_int(stmt.handle, i32(i)))
-			val^ = v
-		case ^time.Time:
-			v := i64(column_int64(stmt.handle, i32(i)))
-			val^ = time.from_nanoseconds(v)
-		}
-	}
-}
-
-Error :: enum {
-	DBOpenFailed          = 1,
-	PrepareStmtFailed     = 2,
-	PrepareStmtExecFailed = 3,
-	BindPrepareStmtFailed = 4,
+ConfigFlags :: enum c.int {
+	SQLITE_CONFIG_STMTSTATUS = 1018,
 }
