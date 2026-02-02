@@ -1,5 +1,6 @@
 package tui
 
+import "core:log"
 import "core:os"
 import "core:unicode/utf8"
 
@@ -142,6 +143,7 @@ parse_escape_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 
 parse_utf8_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 	buf: [4]byte
+	buf[0] = b
 	// Handle Regular utf8 input
 	// Check how many total bytes this rune SHOULD have
 	// utf8.rune_size returns 1, 2, 3, or 4 based on the header byte
@@ -159,6 +161,9 @@ parse_utf8_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 		}
 	}
 	r, _ := utf8.decode_rune(buf[:total_width])
+	if r == utf8.RUNE_ERROR {
+		return Key{type = .None}
+	}
 	return Key{type = .Char, char = r}
 
 }

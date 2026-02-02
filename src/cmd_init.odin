@@ -6,7 +6,7 @@ import "core:log"
 import "core:os"
 import "core:path/filepath"
 
-zsh_init := #load("./shell/cmdd.zsh")
+zsh_init := #load("./shell/histr.zsh")
 
 init_cmd :: proc(args: []string) -> ^cli.Error {
 	if len(args) == 0 {

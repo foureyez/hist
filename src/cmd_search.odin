@@ -49,6 +49,8 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 		cmds = cmd_infos,
 	}
 
+	cmd_infos := cmd_infos
+
 	for {
 		event := tui.poll_event(ui)
 
@@ -56,6 +58,10 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 		case tui.TypeEvent:
 			#partial switch e.key.type {
 			case .Char:
+				strings.write_rune(&query, e.key.char)
+				ui_model.cmds, _ = db_list_cmd(strings.to_string(query))
+			case .Backspace:
+				strings.pop_rune(&query)
 			case .Up:
 				ui_model.selected = max(ui_model.selected - 1, 0)
 			case .Down:
@@ -71,6 +77,8 @@ get_selected_cmd :: proc(cmd_infos: []Command_Info) -> string {
 			}
 		}
 
+
+		tui.write_string(ui, fmt.tprintf("> %s", strings.to_string(query)))
 		for c, i in ui_model.cmds {
 			if i == ui_model.selected {
 				tui.write_string(
