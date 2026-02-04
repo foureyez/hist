@@ -40,7 +40,6 @@ get_selected_cmd :: proc(start_query: string) -> string {
 	query: strings.Builder
 	strings.write_string(&query, start_query)
 
-	limit := 50
 	ui_model := UI_Model{}
 	query_stmt, err := db_prepare_list_stmt()
 	if err != nil {
@@ -49,6 +48,7 @@ get_selected_cmd :: proc(start_query: string) -> string {
 	}
 	defer db_close_list_stmt(query_stmt)
 
+	limit := 50
 	ui_model.cmds, err = db_list_cmd(query_stmt, strings.to_string(query), limit)
 	if err != nil {
 		log.errorf("Unable to list cmd: %s", err)
