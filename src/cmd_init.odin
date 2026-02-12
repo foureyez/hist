@@ -13,7 +13,6 @@ init_cmd :: proc(args: []string) -> ^cli.Error {
 		return cli.error("'shell' required")
 	}
 
-	// Ensure DB schema exists (creates cmd_history table if missing)
 	enable_db_flags(dbh)
 	schema_err := ensure_schema(dbh)
 	if schema_err != nil {

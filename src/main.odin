@@ -50,7 +50,7 @@ main :: proc() {
 	derr: db.Error
 	dbh, derr = db.db_open(db_path)
 	if derr != nil {
-		log.fatalf("Unable to open db: %s", err)
+		log.fatalf("Unable to open db: %s", derr)
 	}
 	defer db.db_close(dbh)
 

@@ -66,11 +66,11 @@ add_subcommand :: proc(cli: ^Cli, parent_name, name, description: string, action
 		name        = name,
 		description = description,
 		action      = action,
-		flags       = make(map[string]Flag), // TODO: How to use cli allocator
+		flags       = make(map[string]Flag, cli.allocator),
 	}
 	parent, ok := &cli.commands[parent_name]
 	if !ok {
-
+		log.fatalf("Unknown parent command '%s' for subcommand '%s'", parent_name, name)
 	}
 	parent.subcommands[name] = cmd
 }
