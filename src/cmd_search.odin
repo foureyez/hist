@@ -6,15 +6,7 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:strings"
-import "core:time"
 import "tui"
-
-Command_Info :: struct {
-	cmd:         string,
-	exit_code:   int,
-	duration:    time.Duration,
-	executed_at: time.Time,
-}
 
 UI_Model :: struct {
 	cmds:     []Command_Info,

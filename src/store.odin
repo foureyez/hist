@@ -1,6 +1,5 @@
 package main
 
-import "core:fmt"
 import "core:log"
 import "core:strings"
 import "core:time"
@@ -74,12 +73,10 @@ db_update_cmd :: proc(id: i64, exit_code: int, duration_ns: i64) -> Error {
 	}
 	defer db.stmt_close(stmt)
 
-	for {
-		if !db.row_next(stmt) {
-			break
-		}
-		id: i64
-		db.row_scan(stmt, context.temp_allocator, &id)
+	_, exec_err := db.stmt_exec(stmt)
+	if exec_err != nil {
+		log.errorf("update: exec failed: %s", exec_err)
+		return .ExecStmtFailed
 	}
 
 	return nil
