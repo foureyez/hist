@@ -1,5 +1,6 @@
 package tui
 
+import "core:log"
 import "core:os"
 import "core:strings"
 
@@ -59,18 +60,18 @@ render_buffer :: proc(ctx: ^Context) {
 	width := ctx.buffer.width
 
 	for i in 0 ..< len(ctx.buffer.cells) {
-		prev_cell := ctx.back_buffer.cells[i]
+		back_cell := ctx.back_buffer.cells[i]
 		cell := ctx.buffer.cells[i]
 
 
-		if cell != prev_cell {
+		if cell != back_cell {
 			if cursor_y != y || cursor_x != x {
 				move_cursor_sb(&ctx.buffer_string, x + 1, y + 1)
 				cursor_x, cursor_y = x, y
 			}
 
 			render_cell(&ctx.buffer_string, cell)
-			ctx.back_buffer.cells[i] = ctx.buffer.cells[i]
+			ctx.back_buffer.cells[i] = cell
 		}
 
 		// Faster than calculating x and y at the start of the loop
