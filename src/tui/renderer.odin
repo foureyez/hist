@@ -1,6 +1,5 @@
 package tui
 
-import "core:log"
 import "core:os"
 import "core:strings"
 
