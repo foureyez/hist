@@ -5,16 +5,16 @@ Command history tool written in Odin.
 Overview
 - Simple TUI to list command history.
 
-Build
-- Build (debug):
-  make build
-- Build (release):
-  make build-release
-
-Development
-- Run smoke tests:
-  make test
-- CI: A GitHub Actions workflow is included in `.github/workflows/ci.yml` which builds debug & release and runs the smoke test.
+Installation
+- Build from source: 
+```
+  make release-all
+```
+- Copy the binary (hist) to /usr/bin/ or just add the binary to PATH
+- Add this line to .zshrc 
+```
+  eval "$(hist init zsh)"
+```
 
 Notes
-- Supports Linux and Mac
+- Supports only Linux and Mac
