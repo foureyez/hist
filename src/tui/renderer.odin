@@ -66,12 +66,10 @@ render_buffer :: proc(ctx: ^Context) {
 		if cell != prev_cell {
 			if cursor_y != y || cursor_x != x {
 				move_cursor_sb(&ctx.buffer_string, x + 1, y + 1)
-				cursor_y = y
-				cursor_x = x
+				cursor_x, cursor_y = x, y
 			}
 
 			render_cell(&ctx.buffer_string, cell)
-			cursor_x += 1
 			ctx.back_buffer.cells[i] = ctx.buffer.cells[i]
 		}
 
