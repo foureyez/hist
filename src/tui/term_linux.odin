@@ -64,9 +64,9 @@ get_term_size :: proc(fd: i32) -> (TermSize, bool) {
 	return TermSize{rows = int(ws.row), cols = int(ws.col)}, true
 }
 
-has_input :: proc(fd: os.Handle, timeout_msec: int) -> bool {
+has_input :: proc(fd: ^os.File, timeout_msec: int) -> bool {
 	pfd: posix.pollfd
-	pfd.fd = posix.FD(fd)
+	pfd.fd = posix.FD(os.fd(fd))
 	pfd.events = {.IN}
 
 	// Timeout 0 means return immediately (don't block)

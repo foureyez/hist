@@ -1,6 +1,5 @@
 package tui
 
-import "core:log"
 import "core:os"
 import "core:unicode/utf8"
 
@@ -29,16 +28,34 @@ Key_Type :: enum {
 	Right,
 }
 
+ESC_FIRST_TIMEOUT_MS :: 50
+ESC_NEXT_TIMEOUT_MS :: 20
+
+read_byte_with_timeout :: proc(f: ^os.File, timeout_ms: int, out: ^byte) -> bool {
+	if !has_input(f, timeout_ms) {
+		return false
+	}
+
+	buf: [1]byte
+	n, err := os.read(f, buf[:])
+	if n == 0 || err != 0 {
+		return false
+	}
+
+	out^ = buf[0]
+	return true
+}
+
 // Blocks until timeout has reached
-read_key :: proc(fd: os.Handle, timeout_ms: int) -> Key {
-	if !has_input(fd, timeout_ms) {
+read_key :: proc(f: ^os.File, timeout_ms: int) -> Key {
+	if !has_input(f, timeout_ms) {
 		return Key{.None, 0}
 	}
 
 	buf: [1]byte
 
 	// 1. Read the first byte
-	n, err := os.read(fd, buf[:])
+	n, err := os.read(f, buf[:])
 	if n == 0 || err != 0 {
 		return Key{.None, 0}
 	}
@@ -56,28 +73,17 @@ read_key :: proc(fd: os.Handle, timeout_ms: int) -> Key {
 		// Map 1->'a', 3->'c', etc. (ASCII 'a' starts at 97)
 		return Key{.Ctrl, rune('a' + (b - 1))}
 	case 27:
-		return parse_escape_sequence(fd, b)
+		return parse_escape_sequence(f)
 	case:
-		return parse_utf8_sequence(fd, b)
+		return parse_utf8_sequence(f, b)
 	}
 }
 
-parse_escape_sequence :: proc(fd: os.Handle, b: byte) -> Key {
-	// We already read the ESC (0x1B).
-	// We must check if more data is waiting IMMEDIATELY.
-	// If we wait 5ms and nothing arrives, it's just the ESC key.
-
-	// Tiny sleep to allow sequence bytes to arrive in buffer
-	// TODO:: Need to see what to do here to remove.
-	// Second thread?
-	if !has_input(fd, 1) {
+parse_escape_sequence :: proc(f: ^os.File) -> Key {
+	b: byte
+	if !read_byte_with_timeout(f, ESC_FIRST_TIMEOUT_MS, &b) {
 		return Key{type = .Esc}
 	}
-
-	// Read next byte
-	buf: [1]u8
-	os.read(fd, buf[:])
-	b := buf[0]
 
 	// Handle Alt + Key (ESC followed by a letter)
 	if (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') {
@@ -86,8 +92,10 @@ parse_escape_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 
 	// Handle CSI sequences (starts with '[')
 	if b == '[' {
-		os.read(fd, buf[:]) // Read command byte
-		c := buf[0]
+		c: byte
+		if !read_byte_with_timeout(f, ESC_NEXT_TIMEOUT_MS, &c) {
+			return Key{type = .Esc}
+		}
 
 		switch c {
 		case 'A':
@@ -103,13 +111,23 @@ parse_escape_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 		case 'F':
 			return Key{type = .End}
 		// Tilde sequences (Delete, PageUp/Down) often look like ESC[3~
-		case '1' ..< '6':
-			// Read the tilde '~'
-			tilde: [1]u8
-			os.read(fd, tilde[:])
+		case '1', '3', '4', '5', '6', '7', '8':
+			t: byte
+			if !read_byte_with_timeout(f, ESC_NEXT_TIMEOUT_MS, &t) {
+				return Key{type = .None}
+			}
+
+			if t != '~' {
+				return Key{type = .None}
+			}
+
 			switch c {
+			case '1', '7':
+				return Key{type = .Home}
 			case '3':
 				return Key{type = .Del}
+			case '4', '8':
+				return Key{type = .End}
 			case '5':
 				return Key{type = .PgUp}
 			case '6':
@@ -121,8 +139,12 @@ parse_escape_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 	// Handle SS3 sequences (starts with 'O', usually F-keys or nav)
 	// Zsh and some other shells use this for arrows (Application Mode)
 	if b == 'O' {
-		os.read(fd, buf[:])
-		switch buf[0] {
+		c: byte
+		if !read_byte_with_timeout(f, ESC_NEXT_TIMEOUT_MS, &c) {
+			return Key{type = .Esc}
+		}
+
+		switch c {
 		case 'A':
 			return Key{type = .Up}
 		case 'B':
@@ -138,10 +160,10 @@ parse_escape_sequence :: proc(fd: os.Handle, b: byte) -> Key {
 		}
 	}
 
-	return Key{type = .None}
+	return Key{type = .Esc}
 }
 
-parse_utf8_sequence :: proc(fd: os.Handle, b: byte) -> Key {
+parse_utf8_sequence :: proc(fd: ^os.File, b: byte) -> Key {
 	buf: [4]byte
 	buf[0] = b
 	// Handle Regular utf8 input
@@ -175,3 +197,4 @@ get_utf8_width :: proc(b: u8) -> int {
 	if (b & 0xF8) == 0xF0 do return 4 // 11110xxx
 	return 1 // Invalid start byte, treat as 1 so we consume it and move on
 }
+

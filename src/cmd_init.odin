@@ -3,10 +3,8 @@ package main
 import "cli"
 import "core:fmt"
 import "core:log"
-import "core:os"
-import "core:path/filepath"
 
-zsh_init := #load("./shell/hist.zsh")
+zsh_init := #load("../shell/hist.zsh")
 
 init_cmd :: proc(args: []string) -> ^cli.Error {
 	if len(args) == 0 {
@@ -29,3 +27,4 @@ init_cmd :: proc(args: []string) -> ^cli.Error {
 	}
 	return nil
 }
+
