@@ -16,7 +16,7 @@ UI_Model :: struct {
 search_cmd :: proc(args: []string) -> ^cli.Error {
 	defer free_all(context.temp_allocator)
 
-	query := os.get_env("HISTR_QUERY")
+	query := os.get_env_alloc("HISTR_QUERY", context.temp_allocator)
 	selected_cmd := get_selected_cmd(query)
 	fmt.print(selected_cmd)
 	return nil
@@ -68,10 +68,12 @@ get_selected_cmd :: proc(start_query: string) -> string {
 			case .Enter:
 				return ui_model.cmds[ui_model.selected].cmd
 			case .Ctrl:
+				log.info(e)
 				if e.key.char == 'c' {
 					return ""
 				}
 			case .Esc:
+				log.info(e)
 				return ""
 			}
 		}
@@ -89,3 +91,4 @@ get_selected_cmd :: proc(start_query: string) -> string {
 		tui.render_frame(ui)
 	}
 }
+

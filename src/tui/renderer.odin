@@ -1,5 +1,6 @@
 package tui
 
+import "core:log"
 import "core:os"
 import "core:strings"
 
@@ -83,7 +84,7 @@ render_buffer :: proc(ctx: ^Context) {
 		}
 	}
 
-	os.write(ctx.output, ctx.buffer_string.buf[:])
+	os.write(ctx.output_file, ctx.buffer_string.buf[:])
 }
 
 render_cell :: proc(sb: ^strings.Builder, cell: Cell) {
@@ -109,3 +110,4 @@ render_cell :: proc(sb: ^strings.Builder, cell: Cell) {
 	strings.write_byte(sb, 'm')
 	strings.write_rune(sb, cell.char)
 }
+

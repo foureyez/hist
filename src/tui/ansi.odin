@@ -1,7 +1,7 @@
 package tui
 
 import "core:fmt"
-import "core:os"
+import os "core:os"
 import "core:strconv"
 import "core:strings"
 
@@ -35,14 +35,14 @@ White :: Color {
 }
 
 // Clear the entire screen
-clear_screen :: proc(fd: os.Handle) {
-	fmt.fprint(fd, "\x1b[2J") // Clear
-	fmt.fprint(fd, "\x1b[H") // Move cursor to 0,0
+clear_screen :: proc(f: ^os.File) {
+	fmt.fprint(f, "\x1b[2J") // Clear
+	fmt.fprint(f, "\x1b[H") // Move cursor to 0,0
 }
 
 // Move cursor to specific X, Y coordinates (1-based)
-move_cursor :: proc(fd: os.Handle, x, y: int) {
-	fmt.fprintf(fd, "\x1b[%d;%dH", y, x)
+move_cursor :: proc(f: ^os.File, x, y: int) {
+	fmt.fprintf(f, "\x1b[%d;%dH", y, x)
 }
 
 move_cursor_sb :: proc(sb: ^strings.Builder, x, y: int) {
@@ -53,38 +53,38 @@ move_cursor_sb :: proc(sb: ^strings.Builder, x, y: int) {
 	strings.write_byte(sb, 'H')
 }
 
-save_cursor :: proc(fd: os.Handle) {
-	fmt.fprint(fd, "\x1b[s")
+save_cursor :: proc(f: ^os.File) {
+	fmt.fprint(f, "\x1b[s")
 }
 
-restore_cursor :: proc(fd: os.Handle) {
-	fmt.fprint(fd, "\x1b[u")
+restore_cursor :: proc(f: ^os.File) {
+	fmt.fprint(f, "\x1b[u")
 }
 
 // Set text color
-set_color :: proc(fd: os.Handle, c: Color) {
-	fmt.fprintf(fd, "\x1b[%dm", int(0))
+set_color :: proc(f: ^os.File, c: Color) {
+	fmt.fprintf(f, "\x1b[%dm", int(0))
 }
 
 // Hide/Show Cursor (Important for clean UI)
-hide_cursor :: proc(fd: os.Handle) {fmt.fprint(fd, "\x1b[?25l")}
-show_cursor :: proc(fd: os.Handle) {fmt.fprint(fd, "\x1b[?25h")}
-reset_cursor :: proc(fd: os.Handle, line_count: int) {
+hide_cursor :: proc(f: ^os.File) {fmt.fprint(f, "\x1b[?25l")}
+show_cursor :: proc(f: ^os.File) {fmt.fprint(f, "\x1b[?25h")}
+reset_cursor :: proc(f: ^os.File, line_count: int) {
 	// \x1b[0m    = Reset all colors/styles
 	// \x1b[2K    = Clear the entire current line
 	// \r         = Move to start of line
-	fmt.fprintf(fd, "\033[1G\033[%dA\033[J", line_count)
+	fmt.fprintf(f, "\033[1G\033[%dA\033[J", line_count)
 }
 
-move_cursor_up :: proc(fd: os.Handle, lines: int) {
-	fmt.fprintf(fd, "\x1b[%dA", lines)
+move_cursor_up :: proc(f: ^os.File, lines: int) {
+	fmt.fprintf(f, "\x1b[%dA", lines)
 }
 
 
-enable_alt_buffer :: proc(fd: os.Handle) {fmt.fprint(fd, "\x1b[?1049h")}
-disable_alt_buffer :: proc(fd: os.Handle) {fmt.fprint(fd, "\x1b[?1049l")}
+enable_alt_buffer :: proc(f: ^os.File) {fmt.fprint(f, "\x1b[?1049h")}
+disable_alt_buffer :: proc(f: ^os.File) {fmt.fprint(f, "\x1b[?1049l")}
 
-get_cursor_pos :: proc(fd: os.Handle) -> (x, y: int) {
+get_cursor_pos :: proc(fd: ^os.File) -> (x, y: int) {
 	// 1. Request cursor position: ESC [ 6 n
 	os.write_string(fd, "\x1b[6n")
 
@@ -130,3 +130,4 @@ get_cursor_pos :: proc(fd: os.Handle) -> (x, y: int) {
 	col, _ := strconv.parse_int(parts[1])
 	return col, row
 }
+

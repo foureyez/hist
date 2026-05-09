@@ -3,8 +3,7 @@ package main
 import "./cli"
 import "core:log"
 import "core:mem"
-import oso "core:os"
-import os "core:os/os2"
+import os "core:os"
 import "core:path/filepath"
 import "db"
 
@@ -23,7 +22,7 @@ main :: proc() {
 		defer reset_tracking_allocator()
 		level = .Debug
 	} else {
-		level = .Error
+		level = .Info
 	}
 
 	home_dir_path, err := os.user_home_dir(context.temp_allocator)
@@ -31,13 +30,22 @@ main :: proc() {
 		panic("Unable to get home dir")
 	}
 
-	app_path := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
+	app_path, path_err := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
+	if path_err != nil {
+		panic("Unable to build app path")
+	}
 	os.mkdir(app_path)
 
-	log_path := filepath.join([]string{home_dir_path, LOG_FILE_PATH}, context.temp_allocator)
-	mode := oso.O_WRONLY | oso.O_CREATE | oso.O_APPEND
-	perm := 0o700
-	log_file, lerr := oso.open(log_path, mode, perm)
+	log_path, log_path_err := filepath.join(
+		[]string{home_dir_path, LOG_FILE_PATH},
+		context.temp_allocator,
+	)
+	if log_path_err != nil {
+		panic("Unable to build log path")
+	}
+	mode := os.O_WRONLY | os.O_CREATE | os.O_APPEND
+	perm := os.perm(0o700)
+	log_file, lerr := os.open(log_path, mode, perm)
 	if lerr != nil {
 		panic("Unable to open log file")
 	}
@@ -46,7 +54,13 @@ main :: proc() {
 	cl := log.create_file_logger(log_file, level)
 	context.logger = cl
 
-	db_path := filepath.join([]string{home_dir_path, DB_FILE_PATH}, context.temp_allocator)
+	db_path, db_path_err := filepath.join(
+		[]string{home_dir_path, DB_FILE_PATH},
+		context.temp_allocator,
+	)
+	if db_path_err != nil {
+		panic("Unable to build db path")
+	}
 	derr: db.Error
 	dbh, derr = db.db_open(db_path)
 	if derr != nil {
@@ -57,6 +71,7 @@ main :: proc() {
 	app_cli := cli.create(context.allocator)
 	defer cli.destroy(app_cli)
 
+	cli.add_command(app_cli, "test", "test", test_cmd)
 	cli.add_command(app_cli, "init", "prints the shell script to initialize cmdd", init_cmd)
 	cli.add_command(app_cli, "add", "add a cli command to history", nil)
 	cli.add_subcommand(
@@ -90,3 +105,4 @@ reset_tracking_allocator :: proc() -> bool {
 	mem.tracking_allocator_clear(a)
 	return err
 }
+

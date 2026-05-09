@@ -144,12 +144,12 @@ print :: proc(cli: ^Cli) {
 	}
 }
 
-cli_run :: proc(cli: ^Cli) -> (err: os.Errno) {
+cli_run :: proc(cli: ^Cli) -> (err: os.Error) {
 	args := os.args
 
 	if len(args) < 2 {
 		cli_print_help(cli)
-		return .NONE
+		return nil
 	}
 
 	cli.app_name = args[0]
@@ -157,25 +157,25 @@ cli_run :: proc(cli: ^Cli) -> (err: os.Errno) {
 
 	if command_name == "help" {
 		cli_print_help(cli)
-		return .EPERM
+		return .Permission_Denied
 	}
 
-	command, ok := cli.commands[command_name]
+	command, ok := &cli.commands[command_name]
 	if !ok {
 		fmt.eprintf("Error: Unknown command '%s'\n\n", command_name)
 		cli_print_help(cli)
-		return .EPERM
+		return .Permission_Denied
 	}
 
-	final_command := command
+	final_command := command^
 	arg_index := 2
 	for arg_index < len(args) {
 		curr_arg := args[arg_index]
-		subcommand, ok := command.subcommands[curr_arg]
+		subcommand, ok := &final_command.subcommands[curr_arg]
 		if !ok {
 			break
 		}
-		final_command = subcommand
+		final_command = subcommand^
 		arg_index += 1
 	}
 
@@ -188,11 +188,11 @@ cli_run :: proc(cli: ^Cli) -> (err: os.Errno) {
 				fmt.printfln("Error: %s", err.message)
 				cli_print_help(cli)
 				free(err)
-				return .EPERM
+				return .Permission_Denied
 			}
 		}
 	}
-	return .NONE
+	return nil
 }
 
 error :: proc(msg: string) -> ^Error {
