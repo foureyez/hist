@@ -1,6 +1,7 @@
 #+build  darwin
 package tui
 
+import "core:log"
 import "core:os"
 import "core:sys/darwin"
 import "core:sys/posix"
@@ -59,25 +60,12 @@ get_term_size :: proc(fd: i32) -> (TermSize, bool) {
 }
 
 has_input :: proc(file: ^os.File, timeout_msec: int) -> bool {
-
-	pfd: posix.pollfd
+	pfd := posix.pollfd{}
 	pfd.fd = posix.FD(os.fd(file))
 	pfd.events = {.IN}
+	pfd.revents = {.IN}
 
 	ret := posix.poll(&pfd, 1, i32(timeout_msec))
-	if ret <= 0 {
-		return false
-	}
-
-	if .NVAL in pfd.revents {
-		pfd.fd = posix.STDIN_FILENO
-		pfd.revents = nil
-		ret = posix.poll(&pfd, 1, i32(timeout_msec))
-		if ret <= 0 {
-			return false
-		}
-	}
-
-	return .IN in pfd.revents
+	return ret > 0
 }
 
