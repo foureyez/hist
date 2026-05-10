@@ -10,8 +10,8 @@ Context :: struct {
 	back_buffer:   Buffer,
 	curr_line:     int,
 	cursor_pos:    [2]int,
-	output_file:   ^os.File,
-	tty_file:      ^os.File,
+	output:        ^os.File,
+	input:         ^os.File,
 	clear_init:    bool,
 	buffer_string: strings.Builder,
 	is_dirty:      bool,
@@ -44,6 +44,7 @@ TTYError :: enum {
 
 new_tui :: proc(
 	config_flags: Config_Flags = nil,
+	input: ^os.File = os.stdin,
 	output: ^os.File = os.stderr,
 	allocator: runtime.Allocator = context.allocator,
 ) -> (
@@ -51,11 +52,8 @@ new_tui :: proc(
 	Error,
 ) {
 
-	tty_file, ferr := os.open("/dev/tty", os.O_RDWR)
-	assert(ferr == nil, "unable to open tty")
-
-	enable_raw_mode(tty_file)
-	curx, cury := get_cursor_pos(tty_file)
+	enable_raw_mode(input)
+	curx, cury := get_cursor_pos(input)
 	hide_cursor(output)
 
 	term_size, ok := get_term_size(i32(os.fd(output)))
@@ -89,10 +87,10 @@ new_tui :: proc(
 
 	ctx := new(Context, allocator)
 	ctx.buffer = buf
-	ctx.tty_file = tty_file
+	ctx.input = input
+	ctx.output = output
 	ctx.back_buffer = back_buf
 	ctx.config_flags = config_flags
-	ctx.output_file = output
 	ctx.cursor_pos = {curx, cury}
 	ctx.buffer_string = buffer_string
 	ctx.is_dirty = true
@@ -102,17 +100,17 @@ new_tui :: proc(
 
 cleanup :: proc(ctx: ^Context) {
 	// reset_cursor(ctx.output, ctx.buffer.height)
-	move_cursor(ctx.output_file, ctx.cursor_pos.x, ctx.cursor_pos.y - 1)
-	show_cursor(ctx.output_file)
+	move_cursor(ctx.output, ctx.cursor_pos.x, ctx.cursor_pos.y - 1)
+	show_cursor(ctx.output)
 	destroy_buffer(&ctx.buffer)
-	disable_raw_mode(ctx.tty_file)
+	disable_raw_mode(ctx.input)
 
 	strings.builder_destroy(&ctx.buffer_string)
 
 	if .FULLSCREEN in ctx.config_flags {
-		disable_alt_buffer(ctx.output_file)
+		disable_alt_buffer(ctx.output)
 	}
-	os.close(ctx.tty_file)
+	os.close(ctx.input)
 	free(ctx)
 }
 
@@ -123,7 +121,7 @@ poll_event :: proc(ctx: ^Context) -> Event {
 		timeout = 16
 	}
 
-	key := read_key(ctx.tty_file, timeout)
+	key := read_key(ctx.input, timeout)
 	if key.type != .None {
 		ctx.is_dirty = true
 		return TypeEvent{key = key}

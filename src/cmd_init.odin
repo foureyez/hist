@@ -1,8 +1,8 @@
 package main
 
 import "cli"
-import "core:fmt"
 import "core:log"
+import "core:os"
 
 zsh_init := #load("../shell/hist.zsh")
 
@@ -20,8 +20,8 @@ init_cmd :: proc(args: []string) -> ^cli.Error {
 	shell := args[0]
 	switch shell {
 	case "zsh":
-		fmt.println(string(zsh_init))
-		fmt.println("bindkey -M emacs '^r' hist-search")
+		os.write(os.stdout, zsh_init)
+		os.write_string(os.stdout, "bindkey -M emacs '^r' hist-search")
 	case:
 		return cli.error("shell not supported")
 	}
