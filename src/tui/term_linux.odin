@@ -7,7 +7,6 @@ import "core:sys/posix"
 
 // Store the original settings to restore them when the app exits
 @(private)
-tty_fd: posix.FD
 orig_termios: posix.termios
 
 TermSize :: struct {
@@ -18,7 +17,7 @@ TermSize :: struct {
 enable_raw_mode :: proc() {
 	// Need to open /dev/tty explicitly since the cli can be invoked as a zsh plugin.
 	// This guarantees you are configuring the actual physical terminal the user is typing into, regardless of how Zsh pipes the input/output.
-	fd := posix.open("/dev/tty", {.RDWR})
+	fd := posix.open("/dev/tty", 0)
 	if fd == -1 {
 		tty_fd = posix.STDIN_FILENO
 	} else {
@@ -73,3 +72,4 @@ has_input :: proc(fd: ^os.File, timeout_msec: int) -> bool {
 	ret := posix.poll(&pfd, 1, i32(timeout_msec))
 	return ret > 0
 }
+

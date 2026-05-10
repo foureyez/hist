@@ -1,7 +1,7 @@
 #+build  darwin
 package tui
 
-import "core:log"
+import "core:c"
 import "core:os"
 import "core:sys/darwin"
 import "core:sys/posix"
@@ -18,8 +18,8 @@ TermSize :: struct {
 enable_raw_mode :: proc(file: ^os.File) {
 	// Need to open /dev/tty explicitly since the cli can be invoked as a zsh plugin.
 	// This guarantees you are configuring the actual physical terminal the user is typing into, regardless of how Zsh pipes the input/output.
-	posix_fd := posix.FD(os.fd(file))
-	posix.tcgetattr(posix_fd, &orig_termios)
+	fd := posix.open("/dev/tty", {})
+	posix.tcgetattr(fd, &orig_termios)
 
 	raw := orig_termios
 
@@ -36,7 +36,7 @@ enable_raw_mode :: proc(file: ^os.File) {
 	raw.c_lflag -= {.ECHO, .ICANON, .ISIG} // Remove ISIG if you want CTRL+C to kill app
 
 	// 3. Apply new attributes
-	posix.tcsetattr(posix_fd, .TCSAFLUSH, &raw)
+	posix.tcsetattr(fd, .TCSAFLUSH, &raw)
 }
 
 disable_raw_mode :: proc(file: ^os.File) {
@@ -60,12 +60,34 @@ get_term_size :: proc(fd: i32) -> (TermSize, bool) {
 }
 
 has_input :: proc(file: ^os.File, timeout_msec: int) -> bool {
-	pfd := posix.pollfd{}
-	pfd.fd = posix.FD(os.fd(file))
-	pfd.events = {.IN}
-	pfd.revents = {.IN}
+	fd := posix.FD(os.fd(file))
+	if fd < 0 {
+		return false
+	}
 
-	ret := posix.poll(&pfd, 1, i32(timeout_msec))
-	return ret > 0
+	readfds := posix.fd_set{}
+	posix.FD_ZERO(&readfds)
+	posix.FD_SET(fd, &readfds)
+
+	timeout_ptr: ^posix.timeval
+	if timeout_msec >= 0 {
+		tv := posix.timeval {
+			tv_sec  = cast(posix.time_t)(timeout_msec / 1000),
+			tv_usec = cast(posix.suseconds_t)((timeout_msec % 1000) * 1000),
+		}
+		timeout_ptr = &tv
+	} else {
+		timeout_ptr = nil
+	}
+
+	// posix.poll() was returning NVAL for tty fd
+	// got the suggestion to use select instead for darwin since poll
+	// has issues with tty device.
+	ret := posix.select(c.int(fd + 1), &readfds, nil, nil, timeout_ptr)
+	if ret <= 0 {
+		return false
+	}
+
+	return posix.FD_ISSET(fd, &readfds)
 }
 

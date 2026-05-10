@@ -27,7 +27,7 @@ _hist_precmd() {
 
 __hist_search_cmd() {
     local -a search_args=("$@")
-    HIST_QUERY=$BUFFER hist search "${search_args[@]}" </dev/tty 2>/dev/tty 
+    HIST_QUERY=$BUFFER hist search "${search_args[@]}" 
 }
 
 _hist_search() {
