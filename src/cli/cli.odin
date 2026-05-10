@@ -137,13 +137,6 @@ cli_print_command_help :: proc(cli: ^Cli, cmd: Command) {
 	}
 }
 
-print :: proc(cli: ^Cli) {
-	for n, c in cli.commands {
-		log.infof("Command: %s", n)
-		log.infof("subcommands:%d", len(c.subcommands))
-	}
-}
-
 cli_run :: proc(cli: ^Cli) -> (err: os.Error) {
 	args := os.args
 
@@ -200,3 +193,4 @@ error :: proc(msg: string) -> ^Error {
 	err.message = msg
 	return err
 }
+

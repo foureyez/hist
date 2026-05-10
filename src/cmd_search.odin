@@ -70,12 +70,10 @@ search_ui :: proc(start_query: string) {
 				os.write_string(os.stdout, ui_model.cmds[ui_model.selected].cmd)
 				return
 			case .Ctrl:
-				log.info(e)
 				if e.key.char == 'c' {
 					return
 				}
 			case .Esc:
-				log.info(e)
 				return
 			}
 		}

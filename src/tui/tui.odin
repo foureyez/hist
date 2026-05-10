@@ -14,7 +14,6 @@ Context :: struct {
 	input:         ^os.File,
 	clear_init:    bool,
 	buffer_string: strings.Builder,
-	is_dirty:      bool,
 }
 
 Event :: union {
@@ -93,7 +92,6 @@ new_tui :: proc(
 	ctx.config_flags = config_flags
 	ctx.cursor_pos = {curx, cury}
 	ctx.buffer_string = buffer_string
-	ctx.is_dirty = true
 
 	return ctx, nil
 }
@@ -116,14 +114,10 @@ cleanup :: proc(ctx: ^Context) {
 
 poll_event :: proc(ctx: ^Context) -> Event {
 	clear_buffer(&ctx.buffer)
-	timeout := -1
-	if ctx.is_dirty == true {
-		timeout = 16
-	}
+	timeout := 16
 
 	key := read_key(ctx.input, timeout)
 	if key.type != .None {
-		ctx.is_dirty = true
 		return TypeEvent{key = key}
 	}
 
@@ -140,14 +134,7 @@ write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color =
 }
 
 render_frame :: proc(ctx: ^Context) {
-	if ctx.is_dirty {
-		render_buffer(ctx)
-		ctx.is_dirty = false
-	}
+	render_buffer(ctx)
 	ctx.curr_line = 0
-}
-
-request_refresh :: proc(ctx: ^Context) {
-	ctx.is_dirty = true
 }
 
