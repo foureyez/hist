@@ -71,7 +71,6 @@ main :: proc() {
 	app_cli := cli.create(context.allocator)
 	defer cli.destroy(app_cli)
 
-	cli.add_command(app_cli, "test", "test", test_cmd)
 	cli.add_command(app_cli, "init", "prints the shell script to initialize cmdd", init_cmd)
 	cli.add_command(app_cli, "add", "add a cli command to history", nil)
 	cli.add_subcommand(

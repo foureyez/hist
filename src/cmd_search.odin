@@ -16,17 +16,19 @@ search_cmd :: proc(args: []string) -> ^cli.Error {
 	defer free_all(context.temp_allocator)
 
 	query := os.get_env_alloc("HISTR_QUERY", context.temp_allocator)
-	search_ui(query)
+	if err := search_ui(query); err != nil {
+		// How to return cli error
+	}
 	return nil
 }
 
-search_ui :: proc(start_query: string) {
+search_ui :: proc(start_query: string) -> Error {
 	tty, tferr := os.open("/dev/tty", os.O_RDWR)
 	assert(tferr == nil, "unable to open tty")
 
 	ui, terr := tui.new_tui({.FULLSCREEN}, tty)
 	if terr != nil {
-		return
+		return terr
 	}
 	defer tui.cleanup(ui)
 
@@ -37,7 +39,7 @@ search_ui :: proc(start_query: string) {
 	query_stmt, err := db_prepare_list_stmt()
 	if err != nil {
 		log.errorf("Unable to prepare stmt for list cmd: %s", err)
-		return
+		return err
 	}
 	defer db_close_list_stmt(query_stmt)
 
@@ -45,10 +47,8 @@ search_ui :: proc(start_query: string) {
 	ui_model.cmds, err = db_list_cmd(query_stmt, strings.to_string(query), limit)
 	if err != nil {
 		log.errorf("Unable to list cmd: %s", err)
-		return
+		return err
 	}
-
-	// ui_model.cmds, _ = db_list_cmd(strings.to_string(query), limit)
 
 	for {
 		event := tui.poll_event(ui)
@@ -68,13 +68,13 @@ search_ui :: proc(start_query: string) {
 				ui_model.selected = min(ui_model.selected + 1, len(ui_model.cmds) - 1)
 			case .Enter:
 				os.write_string(os.stdout, ui_model.cmds[ui_model.selected].cmd)
-				return
+				return nil
 			case .Ctrl:
 				if e.key.char == 'c' {
-					return
+					return nil
 				}
 			case .Esc:
-				return
+				return nil
 			}
 		}
 

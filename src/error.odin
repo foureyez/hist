@@ -1,7 +1,10 @@
 package main
 
+import "tui"
+
 Error :: union {
 	DBError,
+	tui.Error,
 }
 
 DBError :: enum {
@@ -9,3 +12,4 @@ DBError :: enum {
 	ExecStmtFailed,
 	UnableToAddCmd,
 }
+

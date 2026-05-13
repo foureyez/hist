@@ -32,7 +32,7 @@ clear_buffer :: proc(b: ^Buffer) {
 	for i in 0 ..< len(b.cells) {
 		b.cells[i] = Cell {
 			char = ' ',
-			fg   = NoColor,
+			bg   = NoColor,
 		}
 	}
 }
@@ -63,7 +63,7 @@ render_buffer :: proc(ctx: ^Context) {
 		cell := ctx.buffer.cells[i]
 
 
-		if cell != back_cell {
+		if is_cell_changed(cell, back_cell) {
 			if cursor_y != y || cursor_x != x {
 				move_cursor_sb(&ctx.buffer_string, x + 1, y + 1)
 				cursor_x, cursor_y = x, y
@@ -84,6 +84,19 @@ render_buffer :: proc(ctx: ^Context) {
 	}
 
 	os.write(ctx.output, ctx.buffer_string.buf[:])
+}
+
+is_cell_changed :: proc(curr: Cell, last: Cell) -> bool {
+	// Shallow check
+	if curr == last {
+		return false
+	}
+
+	if curr.char == last.char && curr.bg == last.bg && curr.fg == last.fg {
+		return false
+	}
+
+	return true
 }
 
 render_cell :: proc(sb: ^strings.Builder, cell: Cell) {

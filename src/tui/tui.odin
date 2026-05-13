@@ -33,14 +33,6 @@ Config_Flag :: enum {
 	CLEAR_ON_EXIT,
 }
 
-Error :: union {
-	TTYError,
-}
-
-TTYError :: enum {
-	TermSizeFailed,
-}
-
 new_tui :: proc(
 	config_flags: Config_Flags = nil,
 	input: ^os.File = os.stdin,
