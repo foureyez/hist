@@ -13,7 +13,6 @@ LOG_FILE_PATH :: APP_PATH + "/hist.log"
 DB_FILE_PATH :: APP_PATH + "/hist.db"
 
 main :: proc() {
-
 	level: log.Level
 	when ODIN_DEBUG {
 		tracking_allocator: mem.Tracking_Allocator
@@ -62,11 +61,11 @@ main :: proc() {
 		panic("Unable to build db path")
 	}
 	derr: db.Error
-	dbh, derr = db.db_open(db_path)
+	dbh, derr = db.open(db_path)
 	if derr != nil {
 		log.fatalf("Unable to open db: %s", derr)
 	}
-	defer db.db_close(dbh)
+	defer db.close(dbh)
 
 	app_cli := cli.create(context.allocator)
 	defer cli.destroy(app_cli)

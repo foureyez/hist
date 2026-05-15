@@ -36,19 +36,8 @@ search_ui :: proc(start_query: string) -> Error {
 	strings.write_string(&query, start_query)
 
 	ui_model := UI_Model{}
-	query_stmt, err := db_prepare_list_stmt()
-	if err != nil {
-		log.errorf("Unable to prepare stmt for list cmd: %s", err)
-		return err
-	}
-	defer db_close_list_stmt(query_stmt)
 
 	limit := 50
-	ui_model.cmds, err = db_list_cmd(query_stmt, strings.to_string(query), limit)
-	if err != nil {
-		log.errorf("Unable to list cmd: %s", err)
-		return err
-	}
 
 	for {
 		event := tui.poll_event(ui)
@@ -58,10 +47,10 @@ search_ui :: proc(start_query: string) -> Error {
 			#partial switch e.key.type {
 			case .Char:
 				strings.write_rune(&query, e.key.char)
-				ui_model.cmds, _ = db_list_cmd(query_stmt, strings.to_string(query), limit)
+			// ui_model.cmds, _ = db_list_cmd(query_stmt, strings.to_string(query), limit)
 			case .Backspace:
 				strings.pop_rune(&query)
-				ui_model.cmds, _ = db_list_cmd(query_stmt, strings.to_string(query), limit)
+			// ui_model.cmds, _ = db_list_cmd(query_stmt, strings.to_string(query), limit)
 			case .Up:
 				ui_model.selected = max(ui_model.selected - 1, 0)
 			case .Down:

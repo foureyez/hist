@@ -18,10 +18,10 @@ debug: build
 
 build: 
 	@echo "Building hist"
-	odin build ./src -out:hist -collection:deps=deps $(ODIN_BUILD_FLAGS)
+	odin build ./src -out:hist $(ODIN_BUILD_FLAGS)
 
 build-deps:
 	./scripts/build_deps.sh $(DEPS_BUILD_MODE)
 
 run:
-	odin run ./src -out:hist -collection:deps=deps -o:speed -sanitize:address 
+	odin run ./src -out:hist -o:speed -sanitize:address 
