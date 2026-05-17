@@ -1,6 +1,7 @@
 package main
 
 import "./cli"
+import "core:fmt"
 import "core:log"
 import "core:mem"
 import os "core:os"
@@ -9,8 +10,7 @@ import "db"
 
 dbh: ^db.DB
 APP_PATH :: ".config/hist"
-LOG_FILE_PATH :: APP_PATH + "/hist.log"
-DB_FILE_PATH :: APP_PATH + "/hist.db"
+LOG_FILE_PATH :: APP_PATH + "/histv2.log"
 
 main :: proc() {
 	level: log.Level
@@ -18,7 +18,6 @@ main :: proc() {
 		tracking_allocator: mem.Tracking_Allocator
 		mem.tracking_allocator_init(&tracking_allocator, context.allocator)
 		context.allocator = mem.tracking_allocator(&tracking_allocator)
-		defer reset_tracking_allocator()
 		level = .Debug
 	} else {
 		level = .Info
@@ -28,12 +27,6 @@ main :: proc() {
 	if err != nil {
 		panic("Unable to get home dir")
 	}
-
-	app_path, path_err := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
-	if path_err != nil {
-		panic("Unable to build app path")
-	}
-	os.mkdir(app_path)
 
 	log_path, log_path_err := filepath.join(
 		[]string{home_dir_path, LOG_FILE_PATH},
@@ -52,16 +45,16 @@ main :: proc() {
 
 	cl := log.create_file_logger(log_file, level)
 	context.logger = cl
+	defer reset_tracking_allocator()
 
-	db_path, db_path_err := filepath.join(
-		[]string{home_dir_path, DB_FILE_PATH},
-		context.temp_allocator,
-	)
-	if db_path_err != nil {
-		panic("Unable to build db path")
+	app_path, path_err := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
+	if path_err != nil {
+		panic("Unable to build app path")
 	}
+	os.mkdir(app_path)
+
 	derr: db.Error
-	dbh, derr = db.open(db_path)
+	dbh, derr = db.open(app_path)
 	if derr != nil {
 		log.fatalf("Unable to open db: %s", derr)
 	}

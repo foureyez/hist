@@ -105,18 +105,6 @@ reset_cursor :: proc(f: ^os.File, line_count: int) {
 	os.write_string(f, strings.to_string(sb))
 }
 
-move_cursor_up :: proc(f: ^os.File, lines: int) {
-	sb: strings.Builder
-	strings.builder_init(&sb)
-	defer strings.builder_destroy(&sb)
-
-	strings.write_string(&sb, "\x1b[")
-	strings.write_int(&sb, lines)
-	strings.write_byte(&sb, 'A')
-
-	os.write_string(f, strings.to_string(sb))
-}
-
 
 enable_alt_buffer :: proc(f: ^os.File) {os.write_string(f, "\x1b[?1049h")}
 disable_alt_buffer :: proc(f: ^os.File) {os.write_string(f, "\x1b[?1049l")}

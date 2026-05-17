@@ -54,6 +54,16 @@ draw_text :: proc(b: ^Buffer, x, y: int, text: string, fg: Color, bg: Color) {
 render_buffer :: proc(ctx: ^Context) {
 	strings.builder_reset(&ctx.buffer_string)
 	cursor_x, cursor_y := -1, -1
+	last_fg := Color {
+		r = -2,
+		g = -2,
+		b = -2,
+	}
+	last_bg := Color {
+		r = -2,
+		g = -2,
+		b = -2,
+	}
 
 	x, y := 0, 0
 	width := ctx.buffer.width
@@ -69,13 +79,14 @@ render_buffer :: proc(ctx: ^Context) {
 				cursor_x, cursor_y = x, y
 			}
 
-			render_cell(&ctx.buffer_string, cell)
+			is_style_changed := last_fg != cell.fg || last_bg != cell.bg
+			last_fg, last_bg = render_cell(&ctx.buffer_string, cell, is_style_changed)
+
 			ctx.back_buffer.cells[i] = cell
+			cursor_x = x + 1
+			cursor_y = y
 		}
 
-		// Faster than calculating x and y at the start of the loop
-		// x = i % ctx.buffer.width
-		// y = i / ctx.buffer.width
 		x += 1
 		if x >= width {
 			x = 0
@@ -87,39 +98,32 @@ render_buffer :: proc(ctx: ^Context) {
 }
 
 is_cell_changed :: proc(curr: Cell, last: Cell) -> bool {
-	// Shallow check
-	if curr == last {
-		return false
-	}
-
-	if curr.char == last.char && curr.bg == last.bg && curr.fg == last.fg {
-		return false
-	}
-
-	return true
+	return curr != last
 }
 
-render_cell :: proc(sb: ^strings.Builder, cell: Cell) {
+render_cell :: proc(sb: ^strings.Builder, cell: Cell, is_style_changed: bool) -> (Color, Color) {
 	// Faster than fmt.sbprintf(sb,	"\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%r\x1b[0m",...)
-	strings.write_string(sb, "\x1b[38;2;")
+	if is_style_changed {
+		strings.write_string(sb, "\x1b[38;2;")
+		strings.write_int(sb, int(cell.fg.r))
+		strings.write_rune(sb, ';')
+		strings.write_int(sb, int(cell.fg.g))
+		strings.write_rune(sb, ';')
+		strings.write_int(sb, int(cell.fg.b))
 
-	strings.write_int(sb, int(cell.fg.r))
-	strings.write_rune(sb, ';')
-	strings.write_int(sb, int(cell.fg.g))
-	strings.write_rune(sb, ';')
-	strings.write_int(sb, int(cell.fg.b))
-	strings.write_rune(sb, ';')
-
-
-	if cell.bg != NoColor {
-		strings.write_string(sb, ";48;2;") // Leading semicolon joins FG and BG
-		strings.write_int(sb, int(cell.bg.r))
-		strings.write_byte(sb, ';')
-		strings.write_int(sb, int(cell.bg.g))
-		strings.write_byte(sb, ';')
-		strings.write_int(sb, int(cell.bg.b))
+		if cell.bg != NoColor {
+			strings.write_string(sb, ";48;2;") // Leading semicolon joins FG and BG
+			strings.write_int(sb, int(cell.bg.r))
+			strings.write_byte(sb, ';')
+			strings.write_int(sb, int(cell.bg.g))
+			strings.write_byte(sb, ';')
+			strings.write_int(sb, int(cell.bg.b))
+		}
+		strings.write_byte(sb, 'm')
 	}
-	strings.write_byte(sb, 'm')
+
+
 	strings.write_rune(sb, cell.char)
+	return cell.fg, cell.bg
 }
 

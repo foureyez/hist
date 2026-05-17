@@ -104,10 +104,8 @@ cleanup :: proc(ctx: ^Context) {
 	free(ctx)
 }
 
-poll_event :: proc(ctx: ^Context) -> Event {
+poll_event :: proc(ctx: ^Context, timeout: int = 60) -> Event {
 	clear_buffer(&ctx.buffer)
-	timeout := 16
-
 	key := read_key(ctx.input, timeout)
 	if key.type != .None {
 		return TypeEvent{key = key}
