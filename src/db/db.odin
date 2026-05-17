@@ -6,6 +6,7 @@ import "core:log"
 import "core:os"
 import "core:path/filepath"
 import "core:slice"
+import "core:sys/info"
 import "core:time"
 
 
@@ -149,7 +150,15 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) {
 }
 
 search_cmd :: proc(db: ^DB, query: string = {}) -> []string {
-	return db.cmds[:]
+	filtered_cmds := make([dynamic]string)
+
+	mask := prepare_mask(query)
+	for cmd in db.cmds {
+		if fuzzy_search(cmd, query, mask) {
+			append(&filtered_cmds, cmd)
+		}
+	}
+	return filtered_cmds[:]
 }
 
 update_cmd :: proc(db: ^DB, id: u64, duration_ms: u32, exit_code: i32) -> Error {

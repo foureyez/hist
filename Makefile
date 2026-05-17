@@ -23,5 +23,8 @@ build:
 build-deps:
 	./scripts/build_deps.sh $(DEPS_BUILD_MODE)
 
+test:
+	odin test ./src/db 
+
 run:
 	odin run ./src -out:histv2 -o:speed -sanitize:address 
