@@ -73,34 +73,39 @@ open :: proc(path: string) -> (^DB, Error) {
 	return db, nil
 }
 
-add_cmd :: proc(db: ^DB, cmd: Command) -> Error {
+add_cmd :: proc(db: ^DB, cmd: Command) -> (i64, Error) {
 	// TODO: acquire lock before calcuating offset and writing
-	offset, oerr := os.file_size(db.log)
+	log_offset, oerr := os.file_size(db.log)
 	if oerr != nil {
 		log.error(oerr)
-		return .AddCmdFailed
+		return 0, .AddCmdFailed
 	}
 
-	_, err := os.write_at(db.log, transmute([]u8)cmd, offset)
+	_, err := os.write_at(db.log, transmute([]u8)cmd, log_offset)
 	if err != nil {
 		log.error(err)
-		return .AddCmdFailed
+		return 0, .AddCmdFailed
 	}
 
-	index := Command_Index {
-		offset        = u32(offset),
+	idx := Command_Index {
+		offset        = u32(log_offset),
 		length        = u16(len(cmd)),
 		timestamp_sec = u32(time.time_to_unix(time.now())),
 		duration_sec  = 0,
 	}
-	raw_idx := serialize(index)
-	n, ierr := os.write(db.idx, raw_idx)
-	if ierr != nil || n < len(raw_idx) {
+	idx_bytes := serialize(idx)
+	idx_file_size, _ := os.file_size(db.idx)
+	idx_offset := idx_file_size / size_of(Command_Index)
+
+
+	n, ierr := os.write(db.idx, idx_bytes)
+	if ierr != nil || n < len(idx_bytes) {
 		log.error(ierr)
-		return .AddCmdFailed
+		return 0, .AddCmdFailed
 	}
 
-	return nil
+
+	return idx_offset, nil
 }
 
 update_cmd :: proc(db: ^DB, id: u64, duration_sec: u16, exit_code: i8) -> Error {

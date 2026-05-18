@@ -1,6 +1,7 @@
 package main
 
 import "cli"
+import "core:fmt"
 import "core:log"
 import "core:strconv"
 import "db"
@@ -12,10 +13,11 @@ add_start_cmd :: proc(args: []string) -> ^cli.Error {
 	}
 
 	cmd := args[0]
-	err := db.add_cmd(dbh, cmd)
+	id, err := db.add_cmd(dbh, cmd)
 	if err != nil {
 		log.error(err)
 	}
+	fmt.println(id)
 	return nil
 }
 
