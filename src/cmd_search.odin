@@ -125,7 +125,8 @@ search_ui :: proc(start_query: string, low_ts, high_ts: time.Time) -> (string, E
 			// Right-aligned: metadata
 			strings.builder_reset(&line_buf)
 			humanize_time_sb(&line_buf, entry.timestamp_sec)
-			fmt.sbprintf(&line_buf, "  %dms", entry.duration_sec)
+			fmt.sbprint(&line_buf, " ")
+			humanize_duration_sb(&line_buf, entry.duration_ms)
 			meta := strings.to_string(line_buf)
 			meta_x := ui.size.x - len(meta)
 			row := ui.curr_line - 1 // write_string already incremented
@@ -197,6 +198,16 @@ humanize_time_sb :: proc(sb: ^strings.Builder, ts_sec: u32) {
 		fmt.sbprintf(sb, "%dmo ago", days / 30)
 	} else {
 		fmt.sbprintf(sb, "%dy ago", days / 365)
+	}
+}
+
+
+humanize_duration_sb :: proc(sb: ^strings.Builder, duration_ms: u32) {
+	if duration_ms >= 1000 {
+		fmt.sbprintf(sb, "%fs", f32(duration_ms) / 1000)
+	} else {
+		fmt.sbprintf(sb, "%dms", duration_ms)
+
 	}
 }
 

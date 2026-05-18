@@ -17,7 +17,7 @@ DB :: struct {
 Command_Entry :: struct {
 	cmd:           string,
 	timestamp_sec: u32,
-	duration_sec:  u16,
+	duration_ms:   u32,
 	exit_code:     i8,
 }
 
@@ -26,7 +26,7 @@ Command_Index :: struct #packed {
 	offset:        u32,
 	length:        u16,
 	timestamp_sec: u32,
-	duration_sec:  u16,
+	duration_ms:   u32,
 	exit_code:     i8,
 }
 
@@ -91,7 +91,7 @@ add_cmd :: proc(db: ^DB, cmd: Command) -> (i64, Error) {
 		offset        = u32(log_offset),
 		length        = u16(len(cmd)),
 		timestamp_sec = u32(time.time_to_unix(time.now())),
-		duration_sec  = 0,
+		duration_ms   = 0,
 	}
 	idx_bytes := serialize(idx)
 	idx_file_size, _ := os.file_size(db.idx)
@@ -108,7 +108,7 @@ add_cmd :: proc(db: ^DB, cmd: Command) -> (i64, Error) {
 	return idx_offset, nil
 }
 
-update_cmd :: proc(db: ^DB, id: u64, duration_sec: u16, exit_code: i8) -> Error {
+update_cmd :: proc(db: ^DB, id: u64, duration_sec: u32, exit_code: i8) -> Error {
 	size := size_of(Command_Index)
 	out := make([]byte, size)
 
@@ -118,7 +118,7 @@ update_cmd :: proc(db: ^DB, id: u64, duration_sec: u16, exit_code: i8) -> Error 
 	idx: Command_Index
 	deserialize(out, &idx)
 
-	idx.duration_sec = duration_sec
+	idx.duration_ms = duration_sec
 	idx.exit_code = exit_code
 
 	out = serialize(idx)
@@ -210,11 +210,15 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) -> (low_ts, high_ts: time.Time
 			Command_Entry {
 				cmd = string(bulk[lo:hi]),
 				timestamp_sec = record.timestamp_sec,
-				duration_sec = record.duration_sec,
+				duration_ms = record.duration_ms,
 				exit_code = record.exit_code,
 			},
 		)
 	}
+
+	slice.sort_by(db.cmds[:], proc(a, b: Command_Entry) -> bool {
+		return a.timestamp_sec > b.timestamp_sec
+	})
 	return low_ts, high_ts
 }
 

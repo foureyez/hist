@@ -18,7 +18,7 @@ _hist_precmd() {
 
     local duration=""
     if [[ -n $__hist_preexec_time && -n $__hist_precmd_time ]]; then
-        printf -v duration %.0f $(((__hist_precmd_time - __hist_preexec_time) * 1000000000))
+        printf -v duration %.0f $(((__hist_precmd_time - __hist_preexec_time) * 1000))
     fi
 
     (histv2 add end $hist_HISTORY_ID $EXIT $duration &) >/dev/null 2>&1
