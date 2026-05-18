@@ -41,11 +41,15 @@ main :: proc() {
 	if lerr != nil {
 		panic("Unable to open log file")
 	}
+	defer os.close(log_file)
 
 
 	cl := log.create_file_logger(log_file, level)
 	context.logger = cl
-	defer reset_tracking_allocator()
+	when ODIN_DEBUG {
+		defer reset_tracking_allocator()
+	}
+	defer log.destroy_file_logger(cl)
 
 	app_path, path_err := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
 	if path_err != nil {

@@ -1,19 +1,33 @@
 package db
 
 import "base:runtime"
-import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:path/filepath"
 import "core:slice"
-import "core:sys/info"
 import "core:time"
 
-
 DB :: struct {
-	log:  ^os.File,
-	idx:  ^os.File,
-	cmds: [dynamic]string,
+	log:      ^os.File,
+	idx:      ^os.File,
+	cmds:     [dynamic]Command_Entry,
+	cmd_bulk: []byte,
+}
+
+Command_Entry :: struct {
+	cmd:           string,
+	timestamp_sec: u32,
+	duration_sec:  u16,
+	exit_code:     i8,
+}
+
+Command :: string
+Command_Index :: struct #packed {
+	offset:        u32,
+	length:        u16,
+	timestamp_sec: u32,
+	duration_sec:  u16,
+	exit_code:     i8,
 }
 
 Error :: enum {
@@ -74,10 +88,10 @@ add_cmd :: proc(db: ^DB, cmd: Command) -> Error {
 	}
 
 	index := Command_Index {
-		offset       = u64(offset),
-		length       = u32(len(cmd)),
-		timestamp_ms = time.time_to_unix(time.now()),
-		duration_ms  = 0,
+		offset        = u32(offset),
+		length        = u16(len(cmd)),
+		timestamp_sec = u32(time.time_to_unix(time.now())),
+		duration_sec  = 0,
 	}
 	raw_idx := serialize(index)
 	n, ierr := os.write(db.idx, raw_idx)
@@ -89,10 +103,30 @@ add_cmd :: proc(db: ^DB, cmd: Command) -> Error {
 	return nil
 }
 
-load_cmds :: proc(db: ^DB, start_idx, limit: int) {
+update_cmd :: proc(db: ^DB, id: u64, duration_sec: u16, exit_code: i8) -> Error {
+	size := size_of(Command_Index)
+	out := make([]byte, size)
+
+	offset := i64(u64(size) * id)
+	os.read_at(db.idx, out, offset)
+
+	idx: Command_Index
+	deserialize(out, &idx)
+
+	idx.duration_sec = duration_sec
+	idx.exit_code = exit_code
+
+	out = serialize(idx)
+	os.write_at(db.idx, out, offset)
+
+	return nil
+}
+
+load_cmds :: proc(db: ^DB, start_idx, limit: int) -> (low_ts, high_ts: time.Time) {
 	if start_idx < 0 || limit <= 0 {
 		return
 	}
+
 
 	idx_size, serr := os.file_size(db.idx)
 	if serr != nil {
@@ -115,6 +149,12 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) {
 		return
 	}
 
+	defer free_all(context.temp_allocator)
+	if db.cmd_bulk != nil {
+		delete(db.cmd_bulk)
+		clear(&db.cmds)
+	}
+
 	remaining := total_records - i64(start_idx)
 	count := i64(limit)
 	if count > remaining {
@@ -123,80 +163,90 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) {
 
 	read_offset := i64(start_idx) * record_size
 	read_len := count * record_size
-	raw := make([]byte, read_len, context.allocator)
+	raw := make([]byte, read_len, context.temp_allocator)
 	n, rerr := os.read_at(db.idx, raw, read_offset)
 	if rerr != nil || n < len(raw) {
 		log.error(rerr)
 		return
 	}
 
-	records, ok := deserialize_many(raw)
+	records, ok := deserialize_many(raw, context.temp_allocator)
 	if !ok {
 		log.error("failed to deserialize index records")
 		return
 	}
 
-	for record, i in records {
-		cmd_raw := make([]byte, int(record.length), context.allocator)
-		read_n, read_err := os.read_at(db.log, cmd_raw, i64(record.offset))
-		if read_err != nil || read_n < len(cmd_raw) {
-			log.error(read_err)
-			continue
-		}
+	first := records[0]
+	last := records[len(records) - 1]
 
-		append(&db.cmds, string(cmd_raw))
-		// fmt.println(start_idx + i, record, string(cmd_raw))
+	low_ts = time.unix(i64(first.timestamp_sec), 0)
+	high_ts = time.unix(i64(last.timestamp_sec), 0)
+	log.infof("loaded %d commands: %v — %v", len(records), low_ts, high_ts)
+
+	// Single bulk read: compute the byte span covering all commands
+	span_start := i64(first.offset)
+	span_end := i64(last.offset) + i64(last.length)
+	span_len := span_end - span_start
+
+	bulk := make([]byte, span_len, context.allocator)
+	db.cmd_bulk = bulk
+	bulk_n, bulk_err := os.read_at(db.log, bulk, span_start)
+	if bulk_err != nil || bulk_n < len(bulk) {
+		log.error(bulk_err)
+		return
 	}
+
+	// Slice into the bulk buffer per record
+	for record in records {
+		lo := i64(record.offset) - span_start
+		hi := lo + i64(record.length)
+		append(
+			&db.cmds,
+			Command_Entry {
+				cmd = string(bulk[lo:hi]),
+				timestamp_sec = record.timestamp_sec,
+				duration_sec = record.duration_sec,
+				exit_code = record.exit_code,
+			},
+		)
+	}
+	return low_ts, high_ts
 }
 
-search_cmd :: proc(db: ^DB, query: string = {}) -> []string {
-	filtered_cmds := make([dynamic]string)
+search_cmd :: proc(db: ^DB, result: ^[dynamic]Command_Entry, query: string = {}, limit := 100) {
+	clear(result)
 
 	mask := prepare_mask(query)
-	for cmd in db.cmds {
-		if fuzzy_search(cmd, query, mask) {
-			append(&filtered_cmds, cmd)
+	for entry in db.cmds {
+		if fuzzy_search(entry.cmd, query, mask) {
+			append(result, entry)
+			if len(result) > limit {
+				return
+			}
 		}
 	}
-	return filtered_cmds[:]
 }
 
-update_cmd :: proc(db: ^DB, id: u64, duration_ms: u32, exit_code: i32) -> Error {
-	size := size_of(Command_Index)
-	out := make([]byte, size)
-
-	offset := i64(u64(size) * id)
-	os.read_at(db.idx, out, offset)
-
-	idx: Command_Index
-	deserialize(out, &idx)
-
-	idx.duration_ms = duration_ms
-	idx.exit_code = exit_code
-
-	out = serialize(idx)
-	os.write_at(db.idx, out, offset)
-
-	return nil
-}
 
 close :: proc(db: ^DB) {
 	if db == nil {
 		return
 	}
-	os.close(db.log)
-	os.close(db.idx)
+	if db.cmd_bulk != nil {
+		delete(db.cmd_bulk)
+	}
+	delete(db.cmds)
+
+	if db.log != nil {
+		os.close(db.log)
+	}
+
+	if db.idx != nil {
+		os.close(db.idx)
+	}
 	free(db)
 }
 
-Command :: string
-Command_Index :: struct #packed {
-	offset:       u64,
-	length:       u32,
-	timestamp_ms: i64,
-	duration_ms:  u32,
-	exit_code:    i32,
-}
 
 serialize :: proc(record: Command_Index) -> []byte {
 	record := record
@@ -216,14 +266,20 @@ deserialize :: proc(payload: []byte, record: ^Command_Index) -> bool {
 	return true
 }
 
-deserialize_many :: proc(payload: []byte) -> ([]Command_Index, bool) {
+deserialize_many :: proc(
+	payload: []byte,
+	allocator := context.allocator,
+) -> (
+	[]Command_Index,
+	bool,
+) {
 	record_size := size_of(Command_Index)
 	if len(payload) % record_size != 0 {
 		return nil, false
 	}
 
 	count := len(payload) / record_size
-	records := make([]Command_Index, count)
+	records := make([]Command_Index, count, allocator)
 
 	for i in 0 ..< count {
 		start := i * record_size

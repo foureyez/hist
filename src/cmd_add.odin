@@ -31,7 +31,7 @@ add_end_cmd :: proc(args: []string) -> ^cli.Error {
 	offset, _ := strconv.parse_u64_of_base(id_str, 10)
 	duration_ns, _ := strconv.parse_u64(duration_str, 10)
 	exit_code, _ := strconv.parse_int(exit_code_str, 10)
-	db.update_cmd(dbh, offset, u32(duration_ns), i32(exit_code))
+	db.update_cmd(dbh, offset, u16(duration_ns), i8(exit_code))
 	return nil
 }
 

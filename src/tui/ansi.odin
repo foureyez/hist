@@ -33,6 +33,24 @@ White :: Color {
 	b = 255,
 }
 
+Red :: Color {
+	r = 255,
+	g = 0,
+	b = 0,
+}
+
+Green :: Color {
+	r = 0,
+	g = 255,
+	b = 0,
+}
+
+DarkGreen :: Color {
+	r = 0,
+	g = 100,
+	b = 0,
+}
+
 // Clear the entire screen
 clear_screen :: proc(f: ^os.File) {
 	os.write_string(f, "\x1b[2J") // Clear

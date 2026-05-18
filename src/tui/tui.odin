@@ -4,6 +4,10 @@ import "base:runtime"
 import "core:os"
 import "core:strings"
 
+Padding :: struct {
+	top, right, bottom, left: int,
+}
+
 Context :: struct {
 	config_flags:  Config_Flags,
 	buffer:        Buffer,
@@ -14,6 +18,8 @@ Context :: struct {
 	input:         ^os.File,
 	clear_init:    bool,
 	buffer_string: strings.Builder,
+	size:          [2]int,
+	padding:       Padding,
 }
 
 Event :: union {
@@ -37,6 +43,7 @@ new_tui :: proc(
 	config_flags: Config_Flags = nil,
 	input: ^os.File = os.stdin,
 	output: ^os.File = os.stderr,
+	padding: Padding = {},
 	allocator: runtime.Allocator = context.allocator,
 ) -> (
 	^Context,
@@ -84,6 +91,8 @@ new_tui :: proc(
 	ctx.config_flags = config_flags
 	ctx.cursor_pos = {curx, cury}
 	ctx.buffer_string = buffer_string
+	ctx.padding = padding
+	ctx.size = {term_size.cols - padding.left - padding.right, term_size.rows - padding.top - padding.bottom}
 
 	return ctx, nil
 }
@@ -93,6 +102,7 @@ cleanup :: proc(ctx: ^Context) {
 	move_cursor(ctx.output, ctx.cursor_pos.x, ctx.cursor_pos.y - 1)
 	show_cursor(ctx.output)
 	destroy_buffer(&ctx.buffer)
+	destroy_buffer(&ctx.back_buffer)
 	disable_raw_mode(ctx.input)
 
 	strings.builder_destroy(&ctx.buffer_string)
@@ -114,12 +124,12 @@ poll_event :: proc(ctx: ^Context, timeout: int = 60) -> Event {
 	return NoneEvent{}
 }
 
-raw_draw :: proc(ctx: ^Context, x, y: int, text: string, fg: Color, bg: Color) {
-	draw_text(&ctx.buffer, x, y, text, fg, bg)
+raw_draw :: proc(ctx: ^Context, x, y: int, text: string, fg: Color, bg: Color = NoColor) {
+	draw_text(&ctx.buffer, x + ctx.padding.left, y + ctx.padding.top, text, fg, bg)
 }
 
 write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color = NoColor) {
-	draw_text(&ctx.buffer, 0, ctx.curr_line, text, fg, bg)
+	draw_text(&ctx.buffer, ctx.padding.left, ctx.curr_line + ctx.padding.top, text, fg, bg)
 	ctx.curr_line += 1
 }
 
