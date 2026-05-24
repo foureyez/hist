@@ -155,6 +155,7 @@ table_select_down :: proc(t: ^Table) {
 
 table_draw :: proc(ctx: ^Context, t: ^Table) {
 	n_cols := len(t.columns)
+	if n_cols > MAX_TABLE_COLS do n_cols = MAX_TABLE_COLS
 	if n_cols == 0 do return
 
 	// Clamp selected to valid range
