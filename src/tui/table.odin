@@ -142,11 +142,15 @@ table_add_row :: proc(t: ^Table, style: Style, cells: ..string) {
 }
 
 table_select_up :: proc(t: ^Table) {
-	t.selected = (t.selected - 1 % len(t.rows) + len(t.rows)) % len(t.rows)
+	row_count := len(t.rows)
+	if row_count == 0 do return
+	t.selected = (t.selected + row_count - 1) % row_count
 }
 
 table_select_down :: proc(t: ^Table) {
-	t.selected = (t.selected + 1) % len(t.rows)
+	row_count := len(t.rows)
+	if row_count == 0 do return
+	t.selected = (t.selected + 1) % row_count
 }
 
 table_draw :: proc(ctx: ^Context, t: ^Table) {

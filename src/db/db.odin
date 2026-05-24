@@ -10,24 +10,8 @@ import "core:time"
 DB :: struct {
 	log:      ^os.File,
 	idx:      ^os.File,
-	cmds:     [dynamic]Command_Entry,
+	cmds:     [dynamic]Command,
 	cmd_bulk: []byte,
-}
-
-Command_Entry :: struct {
-	cmd:           string,
-	timestamp_sec: u32,
-	duration_ms:   u32,
-	exit_code:     i8,
-}
-
-Command :: string
-Command_Index :: struct #packed {
-	offset:        u32,
-	length:        u16,
-	timestamp_sec: u32,
-	duration_ms:   u32,
-	exit_code:     i8,
 }
 
 Error :: enum {
@@ -36,6 +20,21 @@ Error :: enum {
 	PrepareStmtExecFailed = 3,
 	BindPrepareStmtFailed = 4,
 	AddCmdFailed          = 5,
+}
+
+Command_Index :: struct #packed {
+	offset:        u32,
+	length:        u16,
+	timestamp_sec: u32,
+	duration_ms:   u32,
+	exit_code:     i8,
+}
+
+Command :: struct {
+	cmd:           string,
+	timestamp_sec: u32,
+	duration_ms:   u32,
+	exit_code:     i8,
 }
 
 Filter :: struct {
@@ -73,7 +72,7 @@ open :: proc(path: string) -> (^DB, Error) {
 	return db, nil
 }
 
-add_cmd :: proc(db: ^DB, cmd: Command) -> (i64, Error) {
+add_cmd :: proc(db: ^DB, cmd: string) -> (i64, Error) {
 	// TODO: acquire lock before calcuating offset and writing
 	log_offset, oerr := os.file_size(db.log)
 	if oerr != nil {
@@ -207,7 +206,7 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) -> (low_ts, high_ts: time.Time
 		hi := lo + i64(record.length)
 		append(
 			&db.cmds,
-			Command_Entry {
+			Command {
 				cmd = string(bulk[lo:hi]),
 				timestamp_sec = record.timestamp_sec,
 				duration_ms = record.duration_ms,
@@ -216,13 +215,13 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) -> (low_ts, high_ts: time.Time
 		)
 	}
 
-	slice.sort_by(db.cmds[:], proc(a, b: Command_Entry) -> bool {
+	slice.sort_by(db.cmds[:], proc(a, b: Command) -> bool {
 		return a.timestamp_sec > b.timestamp_sec
 	})
 	return low_ts, high_ts
 }
 
-search_cmd :: proc(db: ^DB, result: ^[dynamic]Command_Entry, query: string = {}, limit := 100) {
+search_cmd :: proc(db: ^DB, result: ^[dynamic]Command, query: string = {}, limit := 100) {
 	clear(result)
 
 	mask := prepare_mask(query)
@@ -241,6 +240,7 @@ close :: proc(db: ^DB) {
 	if db == nil {
 		return
 	}
+
 	if db.cmd_bulk != nil {
 		delete(db.cmd_bulk)
 	}

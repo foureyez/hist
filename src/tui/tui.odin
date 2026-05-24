@@ -110,7 +110,7 @@ cleanup :: proc(ctx: ^Context) {
 
 poll_event :: proc(ctx: ^Context) -> Event {
 	clear_buffer(&ctx.buffer)
-	timeout := -1
+	timeout := 10
 
 	// Refresh the ui instantly if its dirty
 	if ctx.ui_dirty {
@@ -139,7 +139,7 @@ draw_line :: proc(ctx: ^Context, text: string, style: Style = DefaultStyle) {
 	// Clear remaining line
 	{
 		col_start := x + rune_count
-		col_end := ctx.size.x - 1
+		col_end := ctx.size.x
 		for col_start < col_end {
 			idx := y * ctx.buffer.width + col_start
 			ctx.buffer.cells[idx] = Cell {

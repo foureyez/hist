@@ -33,7 +33,7 @@ search_table_cols := [?]tui.Column {
 }
 
 Search_Model :: struct {
-	cmds:          [dynamic]db.Command_Entry,
+	cmds:          [dynamic]db.Command,
 	query:         strings.Builder,
 	ui_query:      strings.Builder,
 	line_buf:      strings.Builder,

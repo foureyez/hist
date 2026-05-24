@@ -93,6 +93,10 @@ render_buffer :: proc(ctx: ^Context) {
 			ctx.back_buffer.cells[i] = cell
 			cursor_x = x + 1
 			cursor_y = y
+			if cursor_x >= width {
+				cursor_x = 0
+				cursor_y += 1
+			}
 		}
 		i += 1
 	}
