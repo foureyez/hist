@@ -1,171 +1,178 @@
 package main
 
-import "base:runtime"
 import "cli"
 import "core:fmt"
-import "core:log"
 import "core:os"
 import "core:strings"
 import "core:time"
 import "db"
 import "tui"
 
-UI_Model :: struct {
-	cmds:     [dynamic]db.Command_Entry,
-	selected: int,
+Search_Model :: struct {
+	cmds:           [dynamic]db.Command_Entry,
+	selected:       int,
+	result:         string,
+	query:          strings.Builder,
+	ui_query:       strings.Builder,
+	line_buf:       strings.Builder,
+	curr_load_idx:  int,
+	low_ts:         time.Time,
+	high_ts:        time.Time,
 }
 
 DEFAULT_LIMIT :: 10000
 
 search_cmd :: proc(args: []string) -> ^cli.Error {
-	// defer free_all(context.temp_allocator)
 	low_ts, high_ts := db.load_cmds(dbh, 0, DEFAULT_LIMIT)
 
-	query := os.get_env_alloc("HISTR_QUERY", context.temp_allocator)
-	result, err := search_ui(query, low_ts, high_ts)
-	if err != nil {
-		// How to return cli error
+	start_query := os.get_env_alloc("HISTR_QUERY", context.temp_allocator)
+
+	model := Search_Model {
+		low_ts  = low_ts,
+		high_ts = high_ts,
 	}
-	if len(result) > 0 {
-		os.write_string(os.stdout, result)
+	defer search_model_destroy(&model)
+	strings.write_string(&model.query, start_query)
+
+	tty, tferr := os.open("/dev/tty", os.O_RDWR)
+	assert(tferr == nil, "unable to open tty")
+
+	err := tui.run(
+		tui.Program {
+			init   = search_init,
+			update = search_update,
+			view   = search_view,
+		},
+		&model,
+		tui.Run_Opts {
+			flags   = {.FULLSCREEN},
+			input   = tty,
+			padding = tui.Padding{top = 1, right = 2, bottom = 1, left = 2},
+			fps     = 60,
+		},
+	)
+	if err != nil {
+		// TODO: return cli error
+	}
+	if len(model.result) > 0 {
+		os.write_string(os.stdout, model.result)
 	}
 	return nil
 }
 
-search_ui :: proc(start_query: string, low_ts, high_ts: time.Time) -> (string, Error) {
-	tty, tferr := os.open("/dev/tty", os.O_RDWR)
-	assert(tferr == nil, "unable to open tty")
+search_model_destroy :: proc(m: ^Search_Model) {
+	delete(m.cmds)
+	strings.builder_destroy(&m.query)
+	strings.builder_destroy(&m.ui_query)
+	strings.builder_destroy(&m.line_buf)
+}
 
-	ui, terr := tui.new_tui(
-		{.FULLSCREEN},
-		tty,
-		padding = tui.Padding{top = 1, right = 2, bottom = 1, left = 2},
-	)
-	if terr != nil {
-		return "", terr
+// ── Init ──
+
+search_init :: proc(ctx: ^tui.Context, ptr: rawptr) -> tui.Cmd {
+	m := cast(^Search_Model)ptr
+	db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
+	return .None
+}
+
+// ── Update ──
+
+search_update :: proc(ctx: ^tui.Context, ptr: rawptr, msg: tui.Msg) -> tui.Cmd {
+	m := cast(^Search_Model)ptr
+
+	key_msg, is_key := msg.(tui.Key_Msg)
+	if !is_key {
+		return .None
 	}
-	defer tui.cleanup(ui)
 
-	query: strings.Builder
-	defer strings.builder_destroy(&query)
-	strings.write_string(&query, start_query)
-
-	ui_model := UI_Model{}
-	defer delete(ui_model.cmds)
-	db.search_cmd(dbh, &ui_model.cmds, start_query, ui.size.y - 5)
-
-	// limit := 50
-	refresh_rate := 1000 / 60 // 60FPS
-	curr_load_idx := 0
-	low_ts, high_ts := low_ts, high_ts
-
-	ui_query: strings.Builder
-	defer strings.builder_destroy(&ui_query)
-	line_buf: strings.Builder
-	defer strings.builder_destroy(&line_buf)
-
-	for {
-		event := tui.poll_event(ui, refresh_rate)
-
-		#partial switch e in event {
-		case tui.TypeEvent:
-			#partial switch e.key.type {
-			case .Char:
-				strings.write_rune(&query, e.key.char)
-				db.search_cmd(dbh, &ui_model.cmds, strings.to_string(query), ui.size.y - 5)
-			case .Backspace:
-				strings.pop_rune(&query)
-				db.search_cmd(dbh, &ui_model.cmds, strings.to_string(query), ui.size.y - 5)
-			case .Up:
-				ui_model.selected = max(ui_model.selected - 1, 0)
-			case .Down:
-				ui_model.selected = min(ui_model.selected + 1, len(ui_model.cmds) - 1)
-			case .Enter:
-				if ui_model.selected < len(ui_model.cmds) {
-					return ui_model.cmds[ui_model.selected].cmd, nil
-				}
-				return "", nil
-			case .Ctrl:
-				switch e.key.char {
-				case 'c':
-					return "", nil
-				case 'r':
-					// Load next page records in db
-					curr_load_idx += DEFAULT_LIMIT
-					low_ts, high_ts = db.load_cmds(dbh, curr_load_idx, DEFAULT_LIMIT)
-					// and filter the new cmds
-					db.search_cmd(dbh, &ui_model.cmds, strings.to_string(query), ui.size.y - 5)
-				case 'g':
-					// Load prev page records in db
-					curr_load_idx -= DEFAULT_LIMIT
-					low_ts, high_ts = db.load_cmds(
-						dbh,
-						curr_load_idx - DEFAULT_LIMIT,
-						DEFAULT_LIMIT,
-					)
-					// and filter the new cmds
-					db.search_cmd(dbh, &ui_model.cmds, strings.to_string(query), ui.size.y - 5)
-				}
-			case .Esc:
-				return "", nil
-			}
+	#partial switch key_msg.key.type {
+	case .Char:
+		strings.write_rune(&m.query, key_msg.key.char)
+		db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
+	case .Backspace:
+		strings.pop_rune(&m.query)
+		db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
+	case .Up:
+		m.selected = max(m.selected - 1, 0)
+	case .Down:
+		m.selected = min(m.selected + 1, len(m.cmds) - 1)
+	case .Enter:
+		if m.selected < len(m.cmds) {
+			m.result = m.cmds[m.selected].cmd
 		}
-
-		strings.builder_reset(&ui_query)
-		strings.write_string(&ui_query, "> ")
-		strings.write_string(&ui_query, strings.to_string(query))
-
-		tui.write_string(ui, strings.to_string(ui_query))
-		for entry, i in ui_model.cmds {
-			fg := i == ui_model.selected ? tui.Grey : entry.exit_code > 0 ? tui.Red : tui.White
-
-			// Left-aligned: command text
-			tui.write_string(ui, entry.cmd, fg)
-
-			// Right-aligned: metadata
-			strings.builder_reset(&line_buf)
-			humanize_time_sb(&line_buf, entry.timestamp_sec)
-			fmt.sbprint(&line_buf, " ")
-			humanize_duration_sb(&line_buf, entry.duration_ms)
-			meta := strings.to_string(line_buf)
-			meta_x := ui.size.x - len(meta)
-			row := ui.curr_line - 1 // write_string already incremented
-			if meta_x > 0 {
-				tui.raw_draw(ui, meta_x, row, meta, fg)
-			}
+		return .Quit
+	case .Ctrl:
+		switch key_msg.key.char {
+		case 'c':
+			return .Quit
+		case 'r':
+			m.curr_load_idx += DEFAULT_LIMIT
+			m.low_ts, m.high_ts = db.load_cmds(dbh, m.curr_load_idx, DEFAULT_LIMIT)
+			db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
+		case 'g':
+			m.curr_load_idx -= DEFAULT_LIMIT
+			m.low_ts, m.high_ts = db.load_cmds(
+				dbh,
+				m.curr_load_idx - DEFAULT_LIMIT,
+				DEFAULT_LIMIT,
+			)
+			db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
 		}
-		// Status line on last row: time range of loaded commands
-		strings.builder_reset(&line_buf)
-		ly, lm, ld := time.date(low_ts)
-		lh, lmin, ls := time.clock_from_time(low_ts)
-		hy, hm, hd := time.date(high_ts)
-		hh, hmin, hs := time.clock_from_time(high_ts)
-		fmt.sbprintf(
-			&line_buf,
-			"[%4d-%02d-%02d %02d:%02d:%02d — %4d-%02d-%02d %02d:%02d:%02d]",
-			ly,
-			int(lm),
-			ld,
-			lh,
-			lmin,
-			ls,
-			hy,
-			int(hm),
-			hd,
-			hh,
-			hmin,
-			hs,
-		)
+	case .Esc:
+		return .Quit
+	}
 
-		tui.raw_draw(ui, 0, ui.size.y - 1, strings.to_string(line_buf), tui.White, tui.DarkGreen)
+	return .None
+}
 
-		version_str := "hist:version: " + VERSION
-		meta_x := ui.size.x - len(version_str)
+// ── View ──
+
+search_view :: proc(ctx: ^tui.Context, ptr: rawptr) {
+	m := cast(^Search_Model)ptr
+
+	// Query line
+	strings.builder_reset(&m.ui_query)
+	strings.write_string(&m.ui_query, "> ")
+	strings.write_string(&m.ui_query, strings.to_string(m.query))
+	tui.write_string(ctx, strings.to_string(m.ui_query))
+
+	// Command list
+	for entry, i in m.cmds {
+		fg := i == m.selected ? tui.Grey : entry.exit_code > 0 ? tui.Red : tui.White
+
+		tui.write_string(ctx, entry.cmd, fg)
+
+		// Right-aligned metadata
+		strings.builder_reset(&m.line_buf)
+		humanize_time_sb(&m.line_buf, entry.timestamp_sec)
+		fmt.sbprint(&m.line_buf, " ")
+		humanize_duration_sb(&m.line_buf, entry.duration_ms)
+		meta := strings.to_string(m.line_buf)
+		meta_x := ctx.size.x - len(meta)
+		row := ctx.curr_line - 1
 		if meta_x > 0 {
-			tui.raw_draw(ui, meta_x, ui.size.y - 1, version_str, tui.White, tui.DarkGreen)
+			tui.raw_draw(ctx, meta_x, row, meta, fg)
 		}
+	}
 
-		tui.render_frame(ui)
+	// Status bar
+	strings.builder_reset(&m.line_buf)
+	ly, lm, ld := time.date(m.low_ts)
+	lh, lmin, ls := time.clock_from_time(m.low_ts)
+	hy, hm, hd := time.date(m.high_ts)
+	hh, hmin, hs := time.clock_from_time(m.high_ts)
+	fmt.sbprintf(
+		&m.line_buf,
+		"[%4d-%02d-%02d %02d:%02d:%02d — %4d-%02d-%02d %02d:%02d:%02d]",
+		ly, int(lm), ld, lh, lmin, ls,
+		hy, int(hm), hd, hh, hmin, hs,
+	)
+	tui.raw_draw(ctx, 0, ctx.size.y - 1, strings.to_string(m.line_buf), tui.White, tui.DarkGreen)
+
+	version_str := "hist:version: " + VERSION
+	meta_x := ctx.size.x - len(version_str)
+	if meta_x > 0 {
+		tui.raw_draw(ctx, meta_x, ctx.size.y - 1, version_str, tui.White, tui.DarkGreen)
 	}
 }
 
