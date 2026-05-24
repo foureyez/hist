@@ -3,11 +3,6 @@ package tui
 import "base:runtime"
 import "core:os"
 import "core:strings"
-import "core:time"
-
-Padding :: struct {
-	top, right, bottom, left: int,
-}
 
 Context :: struct {
 	config_flags:  Config_Flags,
