@@ -79,7 +79,8 @@ bitap_search_asimd :: proc(text: string, query: string, mask: [256]u64) -> bool 
 	state: u64
 	match_bit := u64(1) << u64(len(query) - 1)
 
-	for c in text {
+	for i in 0 ..< len(text) {
+		c := text[i]
 		state = state | (((state << 1) | 1) & mask[c])
 
 		if state & match_bit != 0 {
@@ -98,7 +99,8 @@ bitap_search_avx2 :: proc(text: string, query: string, mask: [256]u64) -> bool {
 	state: u64
 	match_bit := u64(1) << u64(len(query) - 1)
 
-	for c in text {
+	for i in 0 ..< len(text) {
+		c := text[i]
 		state = state | (((state << 1) | 1) & mask[c])
 
 		if state & match_bit != 0 {
@@ -116,7 +118,8 @@ bitap_search_scalar :: proc(text: string, query: string, mask: [256]u64) -> bool
 	state: u64
 	match_bit := u64(1) << u64(len(query) - 1)
 
-	for c in text {
+	for i in 0 ..< len(text) {
+		c := text[i]
 		state = state | (((state << 1) | 1) & mask[c])
 
 		if state & match_bit != 0 {
