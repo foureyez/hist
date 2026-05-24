@@ -57,10 +57,10 @@ search_cmd :: proc(args: []string) -> ^cli.Error {
 		log.error(err)
 		return nil
 	}
-	defer tui.cleanup(ctx)
 
 	model := Search_Model{}
 	search_init(ctx, &model, start_query)
+	defer search_cleanup(ctx, &model)
 
 	result := search_update(ctx, &model)
 	if len(result) > 0 {
@@ -69,7 +69,8 @@ search_cmd :: proc(args: []string) -> ^cli.Error {
 	return nil
 }
 
-search_model_destroy :: proc(m: ^Search_Model) {
+search_cleanup :: proc(ctx: ^tui.Context, m: ^Search_Model) {
+	tui.cleanup(ctx)
 	delete(m.cmds)
 	strings.builder_destroy(&m.query)
 	strings.builder_destroy(&m.ui_query)
@@ -78,6 +79,10 @@ search_model_destroy :: proc(m: ^Search_Model) {
 }
 
 search_init :: proc(ctx: ^tui.Context, m: ^Search_Model, start_query: string) {
+	strings.builder_init(&m.query)
+	strings.builder_init(&m.ui_query)
+	strings.builder_init(&m.line_buf)
+
 	strings.write_string(&m.query, start_query)
 	m.low_ts, m.high_ts = db.load_cmds(dbh, 0, DEFAULT_LOAD_LIMIT)
 	m.table = tui.table_new(
@@ -98,9 +103,12 @@ search_update :: proc(ctx: ^tui.Context, m: ^Search_Model) -> string {
 		case tui.TypeEvent:
 			#partial switch e.key.type {
 			case .Char:
-				strings.write_rune(&m.query, e.key.char)
-				db.search_cmd(dbh, &m.cmds, strings.to_string(m.query))
-				rebuild_table(ctx, m)
+				// Only support query string upto 64 char since the fuzzy search mask supports upto that length
+				if strings.builder_len(m.query) < 64 {
+					strings.write_rune(&m.query, e.key.char)
+					db.search_cmd(dbh, &m.cmds, strings.to_string(m.query))
+					rebuild_table(ctx, m)
+				}
 			case .Backspace:
 				strings.pop_rune(&m.query)
 				db.search_cmd(dbh, &m.cmds, strings.to_string(m.query))

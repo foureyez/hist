@@ -20,6 +20,7 @@ Error :: enum {
 	PrepareStmtExecFailed = 3,
 	BindPrepareStmtFailed = 4,
 	AddCmdFailed          = 5,
+	UpdateCmdFailed       = 6,
 }
 
 Command_Index :: struct #packed {
@@ -74,6 +75,8 @@ open :: proc(path: string) -> (^DB, Error) {
 
 add_cmd :: proc(db: ^DB, cmd: string) -> (i64, Error) {
 	// TODO: acquire lock before calcuating offset and writing
+	defer free_all(context.temp_allocator)
+
 	log_offset, oerr := os.file_size(db.log)
 	if oerr != nil {
 		log.error(oerr)
@@ -101,10 +104,11 @@ add_cmd :: proc(db: ^DB, cmd: string) -> (i64, Error) {
 		timestamp_sec = u32(time.time_to_unix(time.now())),
 		duration_ms   = 0,
 	}
-	idx_bytes := serialize(idx)
+
+	idx_bytes := serialize(idx, context.temp_allocator)
+
 	idx_file_size, _ := os.file_size(db.idx)
 	idx_offset := idx_file_size / size_of(Command_Index)
-
 
 	n, ierr := os.write(db.idx, idx_bytes)
 	if ierr != nil || n < len(idx_bytes) {
@@ -112,24 +116,33 @@ add_cmd :: proc(db: ^DB, cmd: string) -> (i64, Error) {
 		return 0, .AddCmdFailed
 	}
 
-
 	return idx_offset, nil
 }
 
-update_cmd :: proc(db: ^DB, id: u64, duration_sec: u32, exit_code: u8) -> Error {
+update_cmd :: proc(db: ^DB, id: u64, duration_ms: u32, exit_code: u8) -> Error {
+	defer free_all(context.temp_allocator)
 	size := size_of(Command_Index)
-	out := make([]byte, size)
+	out := make([]byte, size, context.temp_allocator)
 
 	offset := i64(u64(size) * id)
-	os.read_at(db.idx, out, offset)
+	n, err := os.read_at(db.idx, out, offset)
+	if err != nil {
+		log.errorf("unable to read the idx file: %v", err)
+		return .UpdateCmdFailed
+	}
+
+	if n != size {
+		log.errorf("unable to read correct size in idx file, n: %d, size: %d", n, size)
+		return .UpdateCmdFailed
+	}
 
 	idx: Command_Index
 	deserialize(out, &idx)
 
-	idx.duration_ms = duration_sec
+	idx.duration_ms = duration_ms
 	idx.exit_code = exit_code
 
-	out = serialize(idx)
+	out = serialize(idx, context.temp_allocator)
 	os.write_at(db.idx, out, offset)
 
 	return nil
@@ -237,7 +250,7 @@ search_cmd :: proc(db: ^DB, result: ^[dynamic]Command, query: string = {}, limit
 	for entry in db.cmds {
 		if fuzzy_search(entry.cmd, query, mask) {
 			append(result, entry)
-			if limit != -1 && len(result) > limit {
+			if limit != -1 && len(result) >= limit {
 				return
 			}
 		}
@@ -266,9 +279,9 @@ close :: proc(db: ^DB) {
 }
 
 
-serialize :: proc(record: Command_Index) -> []byte {
+serialize :: proc(record: Command_Index, allocator := context.allocator) -> []byte {
 	record := record
-	data := make([]byte, size_of(Command_Index), context.allocator)
+	data := make([]byte, size_of(Command_Index), allocator)
 	copy(data, slice.bytes_from_ptr(&record, size_of(Command_Index)))
 	return data
 }

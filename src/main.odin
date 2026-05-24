@@ -1,7 +1,6 @@
 package main
 
 import "./cli"
-import "core:fmt"
 import "core:log"
 import "core:mem"
 import os "core:os"
@@ -28,6 +27,12 @@ main :: proc() {
 		panic("Unable to get home dir")
 	}
 
+	app_path, path_err := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
+	if path_err != nil {
+		panic("Unable to build app path")
+	}
+	os.mkdir(app_path)
+
 	log_path, log_path_err := filepath.join(
 		[]string{home_dir_path, LOG_FILE_PATH},
 		context.temp_allocator,
@@ -51,11 +56,6 @@ main :: proc() {
 	}
 	defer log.destroy_file_logger(cl)
 
-	app_path, path_err := filepath.join([]string{home_dir_path, APP_PATH}, context.temp_allocator)
-	if path_err != nil {
-		panic("Unable to build app path")
-	}
-	os.mkdir(app_path)
 
 	derr: db.Error
 	dbh, derr = db.open(app_path)
