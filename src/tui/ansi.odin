@@ -4,34 +4,6 @@ import os "core:os"
 import "core:strconv"
 import "core:strings"
 
-// Define colors
-Color :: struct {
-	r, g, b: i16,
-}
-
-NoColor :: Color {
-	r = -1,
-	g = -1,
-	b = -1,
-}
-
-Black :: Color {
-	r = 0,
-	g = 0,
-	b = 0,
-}
-
-Grey :: Color {
-	r = 128,
-	g = 128,
-	b = 128,
-}
-
-White :: Color {
-	r = 255,
-	g = 255,
-	b = 255,
-}
 
 // Clear the entire screen
 clear_screen :: proc(f: ^os.File) {
@@ -67,7 +39,7 @@ restore_cursor :: proc(f: ^os.File) {
 
 // Set text color
 set_color :: proc(f: ^os.File, c: Color) {
-	if c.r < 0 || c.g < 0 || c.b < 0 {
+	if c.none {
 		os.write_string(f, "\x1b[0m")
 		return
 	}
@@ -101,18 +73,6 @@ reset_cursor :: proc(f: ^os.File, line_count: int) {
 	strings.write_string(&sb, "\x1b[1G\x1b[")
 	strings.write_int(&sb, line_count)
 	strings.write_string(&sb, "A\x1b[J")
-
-	os.write_string(f, strings.to_string(sb))
-}
-
-move_cursor_up :: proc(f: ^os.File, lines: int) {
-	sb: strings.Builder
-	strings.builder_init(&sb)
-	defer strings.builder_destroy(&sb)
-
-	strings.write_string(&sb, "\x1b[")
-	strings.write_int(&sb, lines)
-	strings.write_byte(&sb, 'A')
 
 	os.write_string(f, strings.to_string(sb))
 }

@@ -54,6 +54,10 @@ create :: proc(allocator: runtime.Allocator) -> ^Cli {
 
 destroy :: proc(cli: ^Cli) {
 	for _, cmd in cli.commands {
+		for _, sub in cmd.subcommands {
+			delete(sub.flags)
+		}
+		delete(cmd.subcommands)
 		delete(cmd.flags)
 	}
 	delete(cli.commands)

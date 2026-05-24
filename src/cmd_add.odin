@@ -2,8 +2,9 @@ package main
 
 import "cli"
 import "core:fmt"
+import "core:log"
 import "core:strconv"
-import "core:time"
+import "db"
 
 
 add_start_cmd :: proc(args: []string) -> ^cli.Error {
@@ -12,7 +13,10 @@ add_start_cmd :: proc(args: []string) -> ^cli.Error {
 	}
 
 	cmd := args[0]
-	id, _ := db_add_cmd(cmd, time.now())
+	id, err := db.add_cmd(dbh, cmd)
+	if err != nil {
+		log.error(err)
+	}
 	fmt.println(id)
 	return nil
 }
@@ -26,9 +30,10 @@ add_end_cmd :: proc(args: []string) -> ^cli.Error {
 	exit_code_str := args[1]
 	duration_str := args[2]
 
-	id, _ := strconv.parse_i64_of_base(id_str, 10)
+	offset, _ := strconv.parse_u64_of_base(id_str, 10)
+	duration_ms, _ := strconv.parse_u64(duration_str, 10)
 	exit_code, _ := strconv.parse_int(exit_code_str, 10)
-	duration_ns, _ := strconv.parse_i64_of_base(duration_str, 10)
-	db_update_cmd(id, exit_code, duration_ns)
+	db.update_cmd(dbh, offset, u32(duration_ms), u8(exit_code))
 	return nil
 }
+

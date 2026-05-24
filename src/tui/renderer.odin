@@ -1,12 +1,14 @@
+#+private
 package tui
 
+import "core:mem"
 import "core:os"
 import "core:strings"
 
+
 Cell :: struct {
-	char: rune,
-	fg:   Color,
-	bg:   Color,
+	char:  rune,
+	style: Style,
 }
 
 Buffer :: struct {
@@ -31,95 +33,133 @@ destroy_buffer :: proc(b: ^Buffer) {
 clear_buffer :: proc(b: ^Buffer) {
 	for i in 0 ..< len(b.cells) {
 		b.cells[i] = Cell {
-			char = ' ',
-			bg   = NoColor,
+			char  = ' ',
+			style = NoStyle,
 		}
 	}
 }
 
-draw_text :: proc(b: ^Buffer, x, y: int, text: string, fg: Color, bg: Color) {
+set_cell :: proc(b: ^Buffer, x, y: int, text: string, style: Style) -> int {
 	row := y
 	col := x
 	for r in text {
 		if col >= 0 && col < b.width && row >= 0 && row < b.height {
 			idx := (row * b.width) + col
 			b.cells[idx].char = r
-			b.cells[idx].fg = fg
-			b.cells[idx].bg = bg
+			b.cells[idx].style = style
 		}
 		col += 1
 	}
+	return col - x
 }
 
 render_buffer :: proc(ctx: ^Context) {
 	strings.builder_reset(&ctx.buffer_string)
 	cursor_x, cursor_y := -1, -1
+	last_style := NoStyle
 
-	x, y := 0, 0
 	width := ctx.buffer.width
+	total := len(ctx.buffer.cells)
+	cell_size := size_of(Cell)
 
-	for i in 0 ..< len(ctx.buffer.cells) {
-		back_cell := ctx.back_buffer.cells[i]
+	i := 0
+	for i < total {
+		// OptimizationPass: Batch-skip 4 unchanged cells at a time
+		if i + 4 <= total {
+			front := ([^]byte)(&ctx.buffer.cells[i])
+			back := ([^]byte)(&ctx.back_buffer.cells[i])
+			span := cell_size * 4
+			if mem.compare(front[:span], back[:span]) == 0 {
+				i += 4
+				continue
+			}
+		}
+
 		cell := ctx.buffer.cells[i]
+		back_cell := ctx.back_buffer.cells[i]
 
+		if cell != back_cell {
+			x := i % width
+			y := i / width
 
-		if is_cell_changed(cell, back_cell) {
 			if cursor_y != y || cursor_x != x {
 				move_cursor_sb(&ctx.buffer_string, x + 1, y + 1)
 				cursor_x, cursor_y = x, y
 			}
 
-			render_cell(&ctx.buffer_string, cell)
-			ctx.back_buffer.cells[i] = cell
-		}
+			is_style_changed := last_style != cell.style
+			last_style = render_cell(&ctx.buffer_string, cell, is_style_changed)
 
-		// Faster than calculating x and y at the start of the loop
-		// x = i % ctx.buffer.width
-		// y = i / ctx.buffer.width
-		x += 1
-		if x >= width {
-			x = 0
-			y += 1
+			ctx.back_buffer.cells[i] = cell
+			cursor_x = x + 1
+			cursor_y = y
+			if cursor_x >= width {
+				cursor_x = 0
+				cursor_y += 1
+			}
 		}
+		i += 1
 	}
 
 	os.write(ctx.output, ctx.buffer_string.buf[:])
 }
 
 is_cell_changed :: proc(curr: Cell, last: Cell) -> bool {
-	// Shallow check
-	if curr == last {
-		return false
-	}
-
-	if curr.char == last.char && curr.bg == last.bg && curr.fg == last.fg {
-		return false
-	}
-
-	return true
+	return curr != last
 }
 
-render_cell :: proc(sb: ^strings.Builder, cell: Cell) {
-	// Faster than fmt.sbprintf(sb,	"\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%r\x1b[0m",...)
-	strings.write_string(sb, "\x1b[38;2;")
-
-	strings.write_int(sb, int(cell.fg.r))
-	strings.write_rune(sb, ';')
-	strings.write_int(sb, int(cell.fg.g))
-	strings.write_rune(sb, ';')
-	strings.write_int(sb, int(cell.fg.b))
-	strings.write_rune(sb, ';')
-
-
-	if cell.bg != NoColor {
-		strings.write_string(sb, ";48;2;") // Leading semicolon joins FG and BG
-		strings.write_int(sb, int(cell.bg.r))
+// Optimization: fast color value write using ascii table
+@(private = "file")
+write_color_val :: #force_inline proc(sb: ^strings.Builder, v: u8) {
+	if v >= 0 && v <= 255 {
 		strings.write_byte(sb, ';')
-		strings.write_int(sb, int(cell.bg.g))
-		strings.write_byte(sb, ';')
-		strings.write_int(sb, int(cell.bg.b))
+		val := int(v)
+		// 3 digit write
+		if val >= 100 {
+			strings.write_byte(sb, u8('0') + u8(val / 100))
+			strings.write_byte(sb, u8('0') + u8((val / 10) % 10))
+			strings.write_byte(sb, u8('0') + u8(val % 10))
+
+			// 2 digit write
+		} else if val >= 10 {
+			strings.write_byte(sb, u8('0') + u8(val / 10))
+			strings.write_byte(sb, u8('0') + u8(val % 10))
+			// 1 digit write
+		} else {
+			strings.write_byte(sb, u8('0') + u8(val))
+		}
 	}
-	strings.write_byte(sb, 'm')
-	strings.write_rune(sb, cell.char)
 }
 
+render_cell :: proc(sb: ^strings.Builder, cell: Cell, is_style_changed: bool) -> Style {
+	if is_style_changed {
+		strings.write_string(sb, "\x1b[")
+
+		if cell.style.fg == NoColor {
+			strings.write_string(sb, "39")
+		} else {
+			strings.write_string(sb, "38;2")
+			write_color_val(sb, cell.style.fg.r)
+			write_color_val(sb, cell.style.fg.g)
+			write_color_val(sb, cell.style.fg.b)
+		}
+
+		if cell.style.bg == NoColor {
+			strings.write_string(sb, ";49")
+		} else {
+			strings.write_string(sb, ";48;2")
+			write_color_val(sb, cell.style.bg.r)
+			write_color_val(sb, cell.style.bg.g)
+			write_color_val(sb, cell.style.bg.b)
+		}
+		strings.write_byte(sb, 'm')
+	}
+
+	// Write_byte for ASCII, write_rune only for non-ASCII
+	if cell.char < 128 {
+		strings.write_byte(sb, u8(cell.char))
+	} else {
+		strings.write_rune(sb, cell.char)
+	}
+	return cell.style
+}

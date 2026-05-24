@@ -10,16 +10,13 @@ import "db"
 dbh: ^db.DB
 APP_PATH :: ".config/hist"
 LOG_FILE_PATH :: APP_PATH + "/hist.log"
-DB_FILE_PATH :: APP_PATH + "/hist.db"
 
 main :: proc() {
-
 	level: log.Level
 	when ODIN_DEBUG {
 		tracking_allocator: mem.Tracking_Allocator
 		mem.tracking_allocator_init(&tracking_allocator, context.allocator)
 		context.allocator = mem.tracking_allocator(&tracking_allocator)
-		defer reset_tracking_allocator()
 		level = .Debug
 	} else {
 		level = .Info
@@ -49,24 +46,23 @@ main :: proc() {
 	if lerr != nil {
 		panic("Unable to open log file")
 	}
+	defer os.close(log_file)
 
 
 	cl := log.create_file_logger(log_file, level)
 	context.logger = cl
-
-	db_path, db_path_err := filepath.join(
-		[]string{home_dir_path, DB_FILE_PATH},
-		context.temp_allocator,
-	)
-	if db_path_err != nil {
-		panic("Unable to build db path")
+	when ODIN_DEBUG {
+		defer reset_tracking_allocator()
 	}
+	defer log.destroy_file_logger(cl)
+
+
 	derr: db.Error
-	dbh, derr = db.db_open(db_path)
+	dbh, derr = db.open(app_path)
 	if derr != nil {
 		log.fatalf("Unable to open db: %s", derr)
 	}
-	defer db.db_close(dbh)
+	defer db.close(dbh)
 
 	app_cli := cli.create(context.allocator)
 	defer cli.destroy(app_cli)

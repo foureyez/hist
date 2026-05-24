@@ -14,6 +14,8 @@ Context :: struct {
 	input:         ^os.File,
 	clear_init:    bool,
 	buffer_string: strings.Builder,
+	size:          [2]int,
+	ui_dirty:      bool,
 }
 
 Event :: union {
@@ -52,7 +54,6 @@ new_tui :: proc(
 		return nil, .TermSizeFailed
 	}
 
-
 	buf: Buffer
 	back_buf: Buffer
 	if .FULLSCREEN in config_flags {
@@ -84,6 +85,8 @@ new_tui :: proc(
 	ctx.config_flags = config_flags
 	ctx.cursor_pos = {curx, cury}
 	ctx.buffer_string = buffer_string
+	ctx.size = {buf.width, buf.height}
+	ctx.ui_dirty = true
 
 	return ctx, nil
 }
@@ -93,6 +96,7 @@ cleanup :: proc(ctx: ^Context) {
 	move_cursor(ctx.output, ctx.cursor_pos.x, ctx.cursor_pos.y - 1)
 	show_cursor(ctx.output)
 	destroy_buffer(&ctx.buffer)
+	destroy_buffer(&ctx.back_buffer)
 	disable_raw_mode(ctx.input)
 
 	strings.builder_destroy(&ctx.buffer_string)
@@ -106,7 +110,13 @@ cleanup :: proc(ctx: ^Context) {
 
 poll_event :: proc(ctx: ^Context) -> Event {
 	clear_buffer(&ctx.buffer)
-	timeout := 16
+	timeout := -1
+
+	// Refresh the ui instantly if its dirty
+	if ctx.ui_dirty {
+		timeout = 0
+		ctx.ui_dirty = false
+	}
 
 	key := read_key(ctx.input, timeout)
 	if key.type != .None {
@@ -116,14 +126,41 @@ poll_event :: proc(ctx: ^Context) -> Event {
 	return NoneEvent{}
 }
 
-raw_draw :: proc(ctx: ^Context, x, y: int, text: string, fg: Color, bg: Color) {
-	draw_text(&ctx.buffer, x, y, text, fg, bg)
+draw_raw :: proc(ctx: ^Context, x, y: int, text: string, style: Style) {
+	set_cell(&ctx.buffer, x, y, text, style)
 }
 
-write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color = NoColor) {
-	draw_text(&ctx.buffer, 0, ctx.curr_line, text, fg, bg)
+draw_line :: proc(ctx: ^Context, text: string, style: Style = DefaultStyle) {
+	x := 0
+	y := ctx.curr_line
+
+	rune_count := set_cell(&ctx.buffer, x, y, text, style)
+
+	// Clear remaining line
+	if 0 <= y && y < ctx.buffer.height {
+		col_start := x + rune_count
+		if col_start < 0 {
+			col_start = 0
+		}
+
+		col_end := ctx.size.x
+		if col_end > ctx.buffer.width {
+			col_end = ctx.buffer.width
+		}
+
+		for col_start < col_end {
+			idx := y * ctx.buffer.width + col_start
+			ctx.buffer.cells[idx] = Cell {
+				char  = ' ',
+				style = style,
+			}
+			col_start += 1
+		}
+	}
+
 	ctx.curr_line += 1
 }
+
 
 render_frame :: proc(ctx: ^Context) {
 	render_buffer(ctx)

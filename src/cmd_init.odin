@@ -1,7 +1,6 @@
 package main
 
 import "cli"
-import "core:log"
 import "core:os"
 
 zsh_init := #load("../shell/hist.zsh")
@@ -11,11 +10,11 @@ init_cmd :: proc(args: []string) -> ^cli.Error {
 		return cli.error("'shell' required")
 	}
 
-	enable_db_flags(dbh)
-	schema_err := ensure_schema(dbh)
-	if schema_err != nil {
-		log.fatalf("Failed to initialize database schema: %s", schema_err)
-	}
+	// enable_db_flags(dbh)
+	// schema_err := ensure_schema(dbh)
+	// if schema_err != nil {
+	// log.fatalf("Failed to initialize database schema: %s", schema_err)
+	// }
 
 	shell := args[0]
 	switch shell {
