@@ -3,6 +3,7 @@ package main
 import "cli"
 import "core:fmt"
 import "core:log"
+import "core:mem"
 import "core:os"
 import "core:strings"
 import "core:time"
@@ -37,6 +38,7 @@ Search_Model :: struct {
 	query:         strings.Builder,
 	line_buf:      strings.Builder,
 	table:         tui.Table,
+	table_pool:    mem.Dynamic_Pool,
 	curr_load_idx: int,
 	low_ts:        time.Time,
 	high_ts:       time.Time,
@@ -75,11 +77,13 @@ search_cleanup :: proc(ctx: ^tui.Context, m: ^Search_Model) {
 	strings.builder_destroy(&m.query)
 	strings.builder_destroy(&m.line_buf)
 	tui.table_destroy(&m.table)
+	mem.dynamic_pool_destroy(&m.table_pool)
 }
 
 search_init :: proc(ctx: ^tui.Context, m: ^Search_Model, start_query: string) {
 	strings.builder_init(&m.query)
 	strings.builder_init(&m.line_buf)
+	mem.dynamic_pool_init(&m.table_pool)
 
 	strings.write_string(&m.query, start_query)
 	m.low_ts, m.high_ts = db.load_cmds(dbh, 0, DEFAULT_LOAD_LIMIT)
@@ -172,18 +176,20 @@ draw_cmds :: proc(ctx: ^tui.Context, m: ^Search_Model) {
 
 rebuild_table :: proc(ctx: ^tui.Context, m: ^Search_Model) {
 	tui.table_clear(&m.table)
+	mem.dynamic_pool_free_all(&m.table_pool)
+	pool_allocator := mem.dynamic_pool_allocator(&m.table_pool)
 	for entry in m.cmds {
 		strings.builder_reset(&m.line_buf)
 		cmd := get_cmd_string(&m.line_buf, entry.cmd, ctx.size.x)
-		cmd_str := strings.clone(cmd, context.temp_allocator)
+		cmd_str := strings.clone(cmd, pool_allocator)
 
 		strings.builder_reset(&m.line_buf)
 		humanize_time_sb(&m.line_buf, entry.timestamp_sec)
-		time_str := strings.clone(strings.to_string(m.line_buf), context.temp_allocator)
+		time_str := strings.clone(strings.to_string(m.line_buf), pool_allocator)
 
 		strings.builder_reset(&m.line_buf)
 		humanize_duration_sb(&m.line_buf, entry.duration_ms)
-		dur_str := strings.clone(strings.to_string(m.line_buf), context.temp_allocator)
+		dur_str := strings.clone(strings.to_string(m.line_buf), pool_allocator)
 
 		style := entry.exit_code > 0 ? style_cmd_err : style_cmd_default
 		tui.table_add_row(&m.table, style, cmd_str, time_str, dur_str)

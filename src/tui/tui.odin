@@ -110,7 +110,7 @@ cleanup :: proc(ctx: ^Context) {
 
 poll_event :: proc(ctx: ^Context) -> Event {
 	clear_buffer(&ctx.buffer)
-	timeout := 10
+	timeout := -1
 
 	// Refresh the ui instantly if its dirty
 	if ctx.ui_dirty {
