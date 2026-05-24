@@ -1,15 +1,17 @@
 # hist
 
-`hist` is a command history tool written in Odin.
+`hist` is a fast shell history manager written in [Odin](https://odin-lang.org/).
 
-It tracks executed shell commands, stores them in a local SQLite-backed database, and provides an interactive terminal UI to search commands quickly.
+It captures shell commands with metadata (exit code, duration, timestamp), stores them in a compact local file-based database, and provides an interactive TUI to fuzzy-search through your history.
 
 ## Features
 
-- Interactive search UI (`hist search`)
-- Zsh integration with a `Ctrl+R` widget
-- Local persistence under your home directory (`~/.config/hist`)
-- Works on macOS and Linux
+- **Interactive TUI search** — fuzzy matching, table display with columns for command, timestamp, and duration
+- **Configurable table widget** — customizable borders (`DEFAULT_BORDERS`, `ROUNDED_BORDERS`, `ASCII_BORDERS`), optional headers, scrollable rows, flexible/fixed column widths
+- **Zsh integration** — `preexec`/`precmd` hooks + `Ctrl+R` ZLE widget
+- **Paginated history loading** — navigate large histories with `Ctrl+R` (next page) / `Ctrl+G` (previous page)
+- **Fuzzy search** — type to filter; results update instantly
+- **Local persistence** — data stored under `~/.config/hist`
 
 ## Requirements
 
@@ -18,46 +20,43 @@ It tracks executed shell commands, stores them in a local SQLite-backed database
 
 ## Build
 
-Build with the project Makefile (recommended):
-
 ```bash
 make build
 ```
 
-Useful targets:
+Targets:
 
-- `make build` - debug-style build (`./hist`)
-- `make debug` - alias around debug build flow
-- `make release` - optimized release binary
-- `make release-all` - build dependencies + release binary
-- `make run` - run directly with sanitizer flags
+- `make build` — debug build (`./hist`)
+- `make debug` — alias for debug build
+- `make release` — optimized release binary
+- `make release-all` — build dependencies (SQLite) + release binary
+- `make build-deps` — download and compile SQLite dependency
+- `make test` — run tests
+- `make run` — run with address sanitizer
 
 ## Installation
 
-After building, place `hist` somewhere in your `PATH`, for example:
+Place the built `hist` binary somewhere in your `PATH`:
 
 ```bash
 cp ./hist /usr/local/bin/hist
 ```
 
-Or add the repository path to `PATH`.
-
 ## Shell Integration (Zsh)
 
-Initialize Zsh integration in your `~/.zshrc`:
+Add to your `~/.zshrc`:
 
 ```bash
 eval "$(hist init zsh)"
 ```
 
-This wires:
+This sets up:
 
-- `preexec` hook to capture command start
-- `precmd` hook to capture exit code + duration
-- `hist-search` ZLE widget
-- key binding for `Ctrl+R` in emacs keymap
+- **`preexec`** hook — captures command text and start time
+- **`precmd`** hook — records exit code and duration
+- **`hist-search`** ZLE widget bound to `Ctrl+R`
 
-Reload shell config:
+Then reload:
 
 ```bash
 source ~/.zshrc
@@ -65,35 +64,40 @@ source ~/.zshrc
 
 ## CLI Commands
 
-`hist init zsh`
+### `hist init zsh`
 
-Prints shell initialization script for Zsh integration.
+Prints the Zsh shell integration script.
 
-`hist add start <cmd>`
+### `hist add start <cmd>`
 
 Creates a history record and prints a record ID.
 
-`hist add end <id> <exit_code> <duration_ns>`
+### `hist add end <id> <exit_code> <duration_ms>`
 
-Completes an existing history record.
+Completes an existing history record with exit code and duration.
 
-`hist search`
+### `hist search`
 
 Launches the interactive TUI search.
 
-- Type to filter commands
-- `Up` / `Down` to navigate
-- `Enter` to select and print the command
-- `Esc` / `Ctrl+C` to exit
+| Key | Action |
+|---|---|
+| Type | Filter commands (fuzzy match) |
+| `Up` / `Down` | Navigate results |
+| `Enter` | Select and print command |
+| `Esc` / `Ctrl+C` | Exit |
+| `Ctrl+R` | Load next page of history |
+| `Ctrl+G` | Load previous page of history |
 
-`hist version`
+### `hist version`
 
-Prints the application version.
+Prints the application version (currently `0.0.2`).
 
 ## Data & Logs
 
-`hist` stores files under:
+Stored under `~/.config/hist/`:
 
-- `~/.config/hist/hist.db` - command history database
-- `~/.config/hist/hist.log` - log output
+- `histdb.log` — append-only command log
+- `histdb.idx` — binary index for fast lookups
+- `hist.log` — application log
 
