@@ -85,7 +85,7 @@ new_tui :: proc(
 	ctx.config_flags = config_flags
 	ctx.cursor_pos = {curx, cury}
 	ctx.buffer_string = buffer_string
-	ctx.size = {term_size.cols, term_size.rows}
+	ctx.size = {buf.width, buf.height}
 	ctx.ui_dirty = true
 
 	return ctx, nil
