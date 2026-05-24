@@ -10,7 +10,7 @@ import "db"
 
 dbh: ^db.DB
 APP_PATH :: ".config/hist"
-LOG_FILE_PATH :: APP_PATH + "/histv2.log"
+LOG_FILE_PATH :: APP_PATH + "/hist.log"
 
 main :: proc() {
 	level: log.Level

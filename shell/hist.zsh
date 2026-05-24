@@ -6,7 +6,7 @@ zmodload zsh/datetime 2>/dev/null
 hist_HISTORY_ID=""
 _hist_preexec() {
     local id
-    id=$(histv2 add start "$1")
+    id=$(hist add start "$1")
     export hist_HISTORY_ID="$id"
     __hist_preexec_time=${EPOCHREALTIME-}
 }
@@ -21,13 +21,13 @@ _hist_precmd() {
         printf -v duration %.0f $(((__hist_precmd_time - __hist_preexec_time) * 1000))
     fi
 
-    (histv2 add end $hist_HISTORY_ID $EXIT $duration &) >/dev/null 2>&1
+    (hist add end $hist_HISTORY_ID $EXIT $duration &) >/dev/null 2>&1
     export hist_HISTORY_ID=""
 }
 
 __hist_search_cmd() {
     local -a search_args=("$@")
-    HIST_QUERY=$BUFFER histv2 search "${search_args[@]}" 
+    HIST_QUERY=$BUFFER hist search "${search_args[@]}" 
 }
 
 _hist_search() {
