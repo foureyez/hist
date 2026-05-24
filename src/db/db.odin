@@ -108,7 +108,11 @@ add_cmd :: proc(db: ^DB, cmd: string) -> (i64, Error) {
 
 	idx_bytes := serialize(idx, context.temp_allocator)
 
-	idx_file_size, _ := os.file_size(db.idx)
+	idx_file_size, ferr := os.file_size(db.idx)
+	if ferr != nil {
+		log.error(ferr)
+		return 0, .AddCmdFailed
+	}
 	idx_offset := idx_file_size / i64(size_of(Command_Index))
 
 	n, ierr := os.write(db.idx, idx_bytes)
