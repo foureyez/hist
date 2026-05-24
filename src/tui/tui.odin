@@ -92,7 +92,10 @@ new_tui :: proc(
 	ctx.cursor_pos = {curx, cury}
 	ctx.buffer_string = buffer_string
 	ctx.padding = padding
-	ctx.size = {term_size.cols - padding.left - padding.right, term_size.rows - padding.top - padding.bottom}
+	ctx.size = {
+		term_size.cols - padding.left - padding.right,
+		term_size.rows - padding.top - padding.bottom,
+	}
 
 	return ctx, nil
 }
@@ -129,7 +132,22 @@ raw_draw :: proc(ctx: ^Context, x, y: int, text: string, fg: Color, bg: Color = 
 }
 
 write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color = NoColor) {
-	draw_text(&ctx.buffer, ctx.padding.left, ctx.curr_line + ctx.padding.top, text, fg, bg)
+	x := ctx.padding.left
+	y := ctx.curr_line + ctx.padding.top
+	draw_text(&ctx.buffer, x, y, text, fg, bg)
+	// Clear remainder of the line so old text doesn't linger
+	col := x + len(text)
+	end := x + ctx.size.x
+	if y >= 0 && y < ctx.buffer.height {
+		for col < end {
+			idx := y * ctx.buffer.width + col
+			ctx.buffer.cells[idx] = Cell {
+				char = ' ',
+				bg   = bg,
+			}
+			col += 1
+		}
+	}
 	ctx.curr_line += 1
 }
 
