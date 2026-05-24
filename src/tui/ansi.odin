@@ -39,7 +39,7 @@ restore_cursor :: proc(f: ^os.File) {
 
 // Set text color
 set_color :: proc(f: ^os.File, c: Color) {
-	if c.r < 0 || c.g < 0 || c.b < 0 {
+	if c.none {
 		os.write_string(f, "\x1b[0m")
 		return
 	}

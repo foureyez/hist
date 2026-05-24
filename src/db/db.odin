@@ -27,14 +27,14 @@ Command_Index :: struct #packed {
 	length:        u16,
 	timestamp_sec: u32,
 	duration_ms:   u32,
-	exit_code:     i8,
+	exit_code:     u8,
 }
 
 Command :: struct {
 	cmd:           string,
 	timestamp_sec: u32,
 	duration_ms:   u32,
-	exit_code:     i8,
+	exit_code:     u8,
 }
 
 Filter :: struct {
@@ -107,7 +107,7 @@ add_cmd :: proc(db: ^DB, cmd: string) -> (i64, Error) {
 	return idx_offset, nil
 }
 
-update_cmd :: proc(db: ^DB, id: u64, duration_sec: u32, exit_code: i8) -> Error {
+update_cmd :: proc(db: ^DB, id: u64, duration_sec: u32, exit_code: u8) -> Error {
 	size := size_of(Command_Index)
 	out := make([]byte, size)
 
