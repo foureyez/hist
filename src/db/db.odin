@@ -256,10 +256,17 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) -> (low_ts, high_ts: time.Time
 	for record in records {
 		lo := i64(record.offset) - span_start
 		hi := lo + i64(record.length)
+		if lo < 0 || hi < lo || hi > i64(len(bulk)) {
+			log.error("corrupted index file: command range out of bounds")
+			return
+		}
+
+		lo_idx := int(lo)
+		hi_idx := int(hi)
 		append(
 			&db.cmds,
 			Command {
-				cmd = string(bulk[lo:hi]),
+				cmd = string(bulk[lo_idx:hi_idx]),
 				timestamp_sec = record.timestamp_sec,
 				duration_ms = record.duration_ms,
 				exit_code = record.exit_code,
