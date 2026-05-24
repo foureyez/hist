@@ -142,13 +142,11 @@ table_add_row :: proc(t: ^Table, style: Style, cells: ..string) {
 }
 
 table_select_up :: proc(t: ^Table) {
-	t.selected = max(t.selected - 1, 0)
+	t.selected = (t.selected - 1 % len(t.rows) + len(t.rows)) % len(t.rows)
 }
 
 table_select_down :: proc(t: ^Table) {
-	if len(t.rows) > 0 {
-		t.selected = min(t.selected + 1, len(t.rows) - 1)
-	}
+	t.selected = (t.selected + 1) % len(t.rows)
 }
 
 table_draw :: proc(ctx: ^Context, t: ^Table) {
