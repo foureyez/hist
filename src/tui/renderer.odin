@@ -129,10 +129,16 @@ write_color_val :: #force_inline proc(sb: ^strings.Builder, v: u8) {
 
 render_cell :: proc(sb: ^strings.Builder, cell: Cell, is_style_changed: bool) -> Style {
 	if is_style_changed {
-		strings.write_string(sb, "\x1b[38;2")
-		write_color_val(sb, cell.style.fg.r)
-		write_color_val(sb, cell.style.fg.g)
-		write_color_val(sb, cell.style.fg.b)
+		strings.write_string(sb, "\x1b[")
+
+		if cell.style.fg == NoColor {
+			strings.write_string(sb, "39")
+		} else {
+			strings.write_string(sb, "38;2")
+			write_color_val(sb, cell.style.fg.r)
+			write_color_val(sb, cell.style.fg.g)
+			write_color_val(sb, cell.style.fg.b)
+		}
 
 		if cell.style.bg == NoColor {
 			strings.write_string(sb, ";49")
@@ -153,4 +159,3 @@ render_cell :: proc(sb: ^strings.Builder, cell: Cell, is_style_changed: bool) ->
 	}
 	return cell.style
 }
-
