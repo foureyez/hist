@@ -80,6 +80,15 @@ add_cmd :: proc(db: ^DB, cmd: string) -> (i64, Error) {
 		return 0, .AddCmdFailed
 	}
 
+	if log_offset > i64(max(u32)) {
+		log.error("log file exceeds 4GiB limit; cannot add command")
+		return 0, .AddCmdFailed
+	}
+	if len(cmd) > int(max(u16)) {
+		log.error("command length exceeds 65535 bytes; cannot add command")
+		return 0, .AddCmdFailed
+	}
+
 	_, err := os.write_at(db.log, transmute([]u8)cmd, log_offset)
 	if err != nil {
 		log.error(err)
