@@ -63,6 +63,7 @@ open :: proc(path: string) -> (^DB, Error) {
 	idx_file, ierr := os.open(idx_path, {.Read, .Write, .Append, .Create})
 	if ierr != nil {
 		log.error(ierr)
+		os.close(log_file)
 		return nil, .DBOpenFailed
 	}
 
@@ -108,7 +109,7 @@ add_cmd :: proc(db: ^DB, cmd: string) -> (i64, Error) {
 	idx_bytes := serialize(idx, context.temp_allocator)
 
 	idx_file_size, _ := os.file_size(db.idx)
-	idx_offset := idx_file_size / size_of(Command_Index)
+	idx_offset := idx_file_size / i64(size_of(Command_Index))
 
 	n, ierr := os.write(db.idx, idx_bytes)
 	if ierr != nil || n < len(idx_bytes) {
@@ -137,13 +138,25 @@ update_cmd :: proc(db: ^DB, id: u64, duration_ms: u32, exit_code: u8) -> Error {
 	}
 
 	idx: Command_Index
-	deserialize(out, &idx)
+	if !deserialize(out, &idx) {
+		log.error("unable to deserialize command at offset: %d", offset)
+		return .UpdateCmdFailed
+	}
 
 	idx.duration_ms = duration_ms
 	idx.exit_code = exit_code
 
 	out = serialize(idx, context.temp_allocator)
-	os.write_at(db.idx, out, offset)
+	n, err = os.write_at(db.idx, out, offset)
+	if err != nil {
+		log.errorf("unable to write to the idx file: %v", err)
+		return .UpdateCmdFailed
+	}
+
+	if n != size {
+		log.errorf("unable to write correct size in idx file, n: %d, size: %d", n, size)
+		return .UpdateCmdFailed
+	}
 
 	return nil
 }
@@ -214,6 +227,8 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) -> (low_ts, high_ts: time.Time
 	span_end := i64(last.offset) + i64(last.length)
 	span_len := span_end - span_start
 
+	// span_len can't be more than int limit since make takes int as size
+	// TODO: instead of single bulk read cap and paginate the load
 	bulk := make([]byte, span_len, context.allocator)
 	db.cmd_bulk = bulk
 	bulk_n, bulk_err := os.read_at(db.log, bulk, span_start)

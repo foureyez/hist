@@ -59,10 +59,10 @@ main :: proc() {
 
 	derr: db.Error
 	dbh, derr = db.open(app_path)
-	defer db.close(dbh)
 	if derr != nil {
 		log.fatalf("Unable to open db: %s", derr)
 	}
+	defer db.close(dbh)
 
 	app_cli := cli.create(context.allocator)
 	defer cli.destroy(app_cli)

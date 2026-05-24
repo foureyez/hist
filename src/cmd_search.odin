@@ -135,7 +135,7 @@ search_update :: proc(ctx: ^tui.Context, m: ^Search_Model) -> string {
 					rebuild_table(ctx, m)
 				case 'g':
 					// Load prev page records in db
-					m.curr_load_idx -= DEFAULT_LOAD_LIMIT
+					m.curr_load_idx = max(m.curr_load_idx - DEFAULT_LOAD_LIMIT, 0)
 					m.low_ts, m.high_ts = db.load_cmds(
 						dbh,
 						m.curr_load_idx - DEFAULT_LOAD_LIMIT,
