@@ -2,6 +2,7 @@ package main
 
 import "cli"
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:strings"
 import "core:time"
@@ -9,15 +10,15 @@ import "db"
 import "tui"
 
 Search_Model :: struct {
-	cmds:           [dynamic]db.Command_Entry,
-	selected:       int,
-	result:         string,
-	query:          strings.Builder,
-	ui_query:       strings.Builder,
-	line_buf:       strings.Builder,
-	curr_load_idx:  int,
-	low_ts:         time.Time,
-	high_ts:        time.Time,
+	cmds:          [dynamic]db.Command_Entry,
+	selected:      int,
+	result:        string,
+	query:         strings.Builder,
+	ui_query:      strings.Builder,
+	line_buf:      strings.Builder,
+	curr_load_idx: int,
+	low_ts:        time.Time,
+	high_ts:       time.Time,
 }
 
 DEFAULT_LIMIT :: 10000
@@ -38,22 +39,14 @@ search_cmd :: proc(args: []string) -> ^cli.Error {
 	assert(tferr == nil, "unable to open tty")
 
 	err := tui.run(
-		tui.Program {
-			init   = search_init,
-			update = search_update,
-			view   = search_view,
-		},
-		&model,
-		tui.Run_Opts {
-			flags   = {.FULLSCREEN},
-			input   = tty,
-			padding = tui.Padding{top = 1, right = 2, bottom = 1, left = 2},
-			fps     = 60,
-		},
+		tui.App{init = search_init, update = search_update, view = search_view, model = &model},
+		tui.Opts{flags = {.FULLSCREEN}, input = tty},
 	)
 	if err != nil {
-		// TODO: return cli error
+		log.error(err)
+		return nil
 	}
+
 	if len(model.result) > 0 {
 		os.write_string(os.stdout, model.result)
 	}
@@ -67,15 +60,11 @@ search_model_destroy :: proc(m: ^Search_Model) {
 	strings.builder_destroy(&m.line_buf)
 }
 
-// ── Init ──
-
 search_init :: proc(ctx: ^tui.Context, ptr: rawptr) -> tui.Cmd {
 	m := cast(^Search_Model)ptr
 	db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
 	return .None
 }
-
-// ── Update ──
 
 search_update :: proc(ctx: ^tui.Context, ptr: rawptr, msg: tui.Msg) -> tui.Cmd {
 	m := cast(^Search_Model)ptr
@@ -111,11 +100,7 @@ search_update :: proc(ctx: ^tui.Context, ptr: rawptr, msg: tui.Msg) -> tui.Cmd {
 			db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
 		case 'g':
 			m.curr_load_idx -= DEFAULT_LIMIT
-			m.low_ts, m.high_ts = db.load_cmds(
-				dbh,
-				m.curr_load_idx - DEFAULT_LIMIT,
-				DEFAULT_LIMIT,
-			)
+			m.low_ts, m.high_ts = db.load_cmds(dbh, m.curr_load_idx - DEFAULT_LIMIT, DEFAULT_LIMIT)
 			db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
 		}
 	case .Esc:
@@ -124,8 +109,6 @@ search_update :: proc(ctx: ^tui.Context, ptr: rawptr, msg: tui.Msg) -> tui.Cmd {
 
 	return .None
 }
-
-// ── View ──
 
 search_view :: proc(ctx: ^tui.Context, ptr: rawptr) {
 	m := cast(^Search_Model)ptr
@@ -164,8 +147,18 @@ search_view :: proc(ctx: ^tui.Context, ptr: rawptr) {
 	fmt.sbprintf(
 		&m.line_buf,
 		"[%4d-%02d-%02d %02d:%02d:%02d — %4d-%02d-%02d %02d:%02d:%02d]",
-		ly, int(lm), ld, lh, lmin, ls,
-		hy, int(hm), hd, hh, hmin, hs,
+		ly,
+		int(lm),
+		ld,
+		lh,
+		lmin,
+		ls,
+		hy,
+		int(hm),
+		hd,
+		hh,
+		hmin,
+		hs,
 	)
 	tui.raw_draw(ctx, 0, ctx.size.y - 1, strings.to_string(m.line_buf), tui.White, tui.DarkGreen)
 

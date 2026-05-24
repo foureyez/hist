@@ -6,5 +6,6 @@ Error :: union {
 
 TTYError :: enum {
 	TermSizeFailed,
+	InvalidInput,
 }
 

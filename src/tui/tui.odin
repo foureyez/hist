@@ -43,7 +43,6 @@ new_tui :: proc(
 	config_flags: Config_Flags = nil,
 	input: ^os.File = os.stdin,
 	output: ^os.File = os.stderr,
-	padding: Padding = {},
 	allocator: runtime.Allocator = context.allocator,
 ) -> (
 	^Context,
@@ -58,7 +57,6 @@ new_tui :: proc(
 	if !ok {
 		return nil, .TermSizeFailed
 	}
-
 
 	buf: Buffer
 	back_buf: Buffer
@@ -91,11 +89,7 @@ new_tui :: proc(
 	ctx.config_flags = config_flags
 	ctx.cursor_pos = {curx, cury}
 	ctx.buffer_string = buffer_string
-	ctx.padding = padding
-	ctx.size = {
-		term_size.cols - padding.left - padding.right,
-		term_size.rows - padding.top - padding.bottom,
-	}
+	ctx.size = {term_size.cols, term_size.rows}
 
 	return ctx, nil
 }
