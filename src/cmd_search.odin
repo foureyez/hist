@@ -35,7 +35,6 @@ search_table_cols := [?]tui.Column {
 Search_Model :: struct {
 	cmds:          [dynamic]db.Command,
 	query:         strings.Builder,
-	ui_query:      strings.Builder,
 	line_buf:      strings.Builder,
 	table:         tui.Table,
 	curr_load_idx: int,
@@ -73,14 +72,12 @@ search_cleanup :: proc(ctx: ^tui.Context, m: ^Search_Model) {
 	tui.cleanup(ctx)
 	delete(m.cmds)
 	strings.builder_destroy(&m.query)
-	strings.builder_destroy(&m.ui_query)
 	strings.builder_destroy(&m.line_buf)
 	tui.table_destroy(&m.table)
 }
 
 search_init :: proc(ctx: ^tui.Context, m: ^Search_Model, start_query: string) {
 	strings.builder_init(&m.query)
-	strings.builder_init(&m.ui_query)
 	strings.builder_init(&m.line_buf)
 
 	strings.write_string(&m.query, start_query)
