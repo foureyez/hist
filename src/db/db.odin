@@ -206,6 +206,11 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) -> (low_ts, high_ts: time.Time
 
 	read_offset := i64(start_idx) * record_size
 	read_len := count * record_size
+	if read_len > i64(max(int)) {
+		log.error("read length exceeds int range")
+		return
+	}
+
 	raw := make([]byte, read_len, context.temp_allocator)
 	n, rerr := os.read_at(db.idx, raw, read_offset)
 	if rerr != nil || n < len(raw) {
@@ -231,8 +236,14 @@ load_cmds :: proc(db: ^DB, start_idx, limit: int) -> (low_ts, high_ts: time.Time
 	span_end := i64(last.offset) + i64(last.length)
 	span_len := span_end - span_start
 
+
 	// span_len can't be more than int limit since make takes int as size
 	// TODO: instead of single bulk read cap and paginate the load
+	if span_len > i64(max(int)) {
+		log.error("command span length exceeds int range")
+		return
+	}
+
 	bulk := make([]byte, span_len, context.allocator)
 	db.cmd_bulk = bulk
 	bulk_n, bulk_err := os.read_at(db.log, bulk, span_start)
