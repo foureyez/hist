@@ -229,7 +229,7 @@ search_cmd :: proc(db: ^DB, result: ^[dynamic]Command_Entry, query: string = {},
 	for entry in db.cmds {
 		if fuzzy_search(entry.cmd, query, mask) {
 			append(result, entry)
-			if len(result) > limit {
+			if limit != -1 && len(result) > limit {
 				return
 			}
 		}

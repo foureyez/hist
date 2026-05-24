@@ -3,6 +3,7 @@ package tui
 import "base:runtime"
 import "core:os"
 import "core:strings"
+import "core:time"
 
 Padding :: struct {
 	top, right, bottom, left: int,
@@ -19,6 +20,7 @@ Context :: struct {
 	clear_init:    bool,
 	buffer_string: strings.Builder,
 	size:          [2]int,
+	ui_dirty:      bool,
 }
 
 Event :: union {
@@ -89,6 +91,7 @@ new_tui :: proc(
 	ctx.cursor_pos = {curx, cury}
 	ctx.buffer_string = buffer_string
 	ctx.size = {term_size.cols, term_size.rows}
+	ctx.ui_dirty = true
 
 	return ctx, nil
 }
@@ -110,8 +113,16 @@ cleanup :: proc(ctx: ^Context) {
 	free(ctx)
 }
 
-poll_event :: proc(ctx: ^Context, timeout: int = 60) -> Event {
+poll_event :: proc(ctx: ^Context) -> Event {
 	clear_buffer(&ctx.buffer)
+	timeout := -1
+
+	// Refresh the ui instantly if its dirty
+	if ctx.ui_dirty {
+		timeout = 0
+		ctx.ui_dirty = false
+	}
+
 	key := read_key(ctx.input, timeout)
 	if key.type != .None {
 		return TypeEvent{key = key}

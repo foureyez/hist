@@ -24,46 +24,47 @@ style_cmd_err := tui.Style {
 	bg = tui.NoColor,
 }
 
+DEFAULT_LOAD_LIMIT :: 100000
+
+search_table_cols := [?]tui.Column {
+	{name = "Command", align = .Left},
+	{name = "When", align = .Right, width = 12},
+	{name = "Duration", align = .Right, width = 10},
+}
+
 Search_Model :: struct {
 	cmds:          [dynamic]db.Command_Entry,
-	selected:      int,
-	result:        string,
 	query:         strings.Builder,
 	ui_query:      strings.Builder,
 	line_buf:      strings.Builder,
+	table:         tui.Table,
 	curr_load_idx: int,
 	low_ts:        time.Time,
 	high_ts:       time.Time,
 }
 
-DEFAULT_LIMIT :: 100000
 
 search_cmd :: proc(args: []string) -> ^cli.Error {
-	low_ts, high_ts := db.load_cmds(dbh, 0, DEFAULT_LIMIT)
-
 	start_query := os.get_env_alloc("HISTR_QUERY", context.temp_allocator)
-
-	model := Search_Model {
-		low_ts  = low_ts,
-		high_ts = high_ts,
-	}
-	defer search_model_destroy(&model)
-	strings.write_string(&model.query, start_query)
-
 	tty, tferr := os.open("/dev/tty", os.O_RDWR)
-	assert(tferr == nil, "unable to open tty")
+	if tferr != nil {
+		log.error(tferr)
+		return nil
+	}
 
-	err := tui.run(
-		tui.App{init = search_init, update = search_update, view = search_view, model = &model},
-		tui.Opts{flags = {.FULLSCREEN}, input = tty},
-	)
+	ctx, err := tui.new_tui({.FULLSCREEN}, input = tty)
 	if err != nil {
 		log.error(err)
 		return nil
 	}
+	defer tui.cleanup(ctx)
 
-	if len(model.result) > 0 {
-		os.write_string(os.stdout, model.result)
+	model := Search_Model{}
+	search_init(ctx, &model, start_query)
+
+	result := search_update(ctx, &model)
+	if len(result) > 0 {
+		os.write_string(os.stdout, result)
 	}
 	return nil
 }
@@ -73,136 +74,138 @@ search_model_destroy :: proc(m: ^Search_Model) {
 	strings.builder_destroy(&m.query)
 	strings.builder_destroy(&m.ui_query)
 	strings.builder_destroy(&m.line_buf)
+	tui.table_destroy(&m.table)
 }
 
-search_init :: proc(ctx: ^tui.Context, ptr: rawptr) -> tui.Cmd {
-	m := cast(^Search_Model)ptr
-	db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
-	return .None
+search_init :: proc(ctx: ^tui.Context, m: ^Search_Model, start_query: string) {
+	strings.write_string(&m.query, start_query)
+	m.low_ts, m.high_ts = db.load_cmds(dbh, 0, DEFAULT_LOAD_LIMIT)
+	m.table = tui.table_new(
+		search_table_cols[:],
+		style_cmd_highlighted,
+		border_set = tui.ASCII_BORDERS,
+		flags = {.SHOW_HEADERS, .SHOW_BORDERS},
+		height = ctx.size.y - 2,
+	)
+	db.search_cmd(dbh, &m.cmds, strings.to_string(m.query))
+	rebuild_table(ctx, m)
 }
 
-search_update :: proc(ctx: ^tui.Context, ptr: rawptr, msg: tui.Msg) -> tui.Cmd {
-	m := cast(^Search_Model)ptr
+search_update :: proc(ctx: ^tui.Context, m: ^Search_Model) -> string {
+	for {
+		event := tui.poll_event(ctx)
+		#partial switch e in event {
+		case tui.TypeEvent:
+			#partial switch e.key.type {
+			case .Char:
+				strings.write_rune(&m.query, e.key.char)
+				db.search_cmd(dbh, &m.cmds, strings.to_string(m.query))
+				rebuild_table(ctx, m)
+			case .Backspace:
+				strings.pop_rune(&m.query)
+				db.search_cmd(dbh, &m.cmds, strings.to_string(m.query))
+				rebuild_table(ctx, m)
+			case .Up:
+				tui.table_select_up(&m.table)
+			case .Down:
+				tui.table_select_down(&m.table)
+			case .Enter:
+				sel := m.table.selected
+				if sel >= 0 && sel < len(m.cmds) {
+					return m.cmds[sel].cmd
+				}
+			case .Ctrl:
+				switch e.key.char {
+				case 'c':
+					return ""
+				case 'r':
+					// Load next page records in db
+					m.curr_load_idx += DEFAULT_LOAD_LIMIT
+					m.low_ts, m.high_ts = db.load_cmds(dbh, m.curr_load_idx, DEFAULT_LOAD_LIMIT)
+					// and filter the new cmds
+					db.search_cmd(dbh, &m.cmds, strings.to_string(m.query))
+					rebuild_table(ctx, m)
+				case 'g':
+					// Load prev page records in db
+					m.curr_load_idx -= DEFAULT_LOAD_LIMIT
+					m.low_ts, m.high_ts = db.load_cmds(
+						dbh,
+						m.curr_load_idx - DEFAULT_LOAD_LIMIT,
+						DEFAULT_LOAD_LIMIT,
+					)
+					// and filter the new cmds
+					db.search_cmd(dbh, &m.cmds, strings.to_string(m.query))
+					rebuild_table(ctx, m)
+				}
+			case .Esc:
+				return ""
+			}
+		}
 
-	key_msg, is_key := msg.(tui.Key_Msg)
-	if !is_key {
-		return .None
+		search_view(ctx, m)
 	}
-
-	#partial switch key_msg.key.type {
-	case .Char:
-		strings.write_rune(&m.query, key_msg.key.char)
-		db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
-		if len(m.cmds) < m.selected {
-			m.selected = 0
-		}
-	case .Backspace:
-		strings.pop_rune(&m.query)
-		db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
-	case .Up:
-		m.selected = max(m.selected - 1, 0)
-	case .Down:
-		m.selected = min(m.selected + 1, len(m.cmds) - 1)
-	case .Enter:
-		if m.selected < len(m.cmds) {
-			m.result = m.cmds[m.selected].cmd
-		}
-		return .Quit
-	case .Ctrl:
-		switch key_msg.key.char {
-		case 'c':
-			return .Quit
-		case 'r':
-			m.curr_load_idx += DEFAULT_LIMIT
-			m.low_ts, m.high_ts = db.load_cmds(dbh, m.curr_load_idx, DEFAULT_LIMIT)
-			db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
-		case 'g':
-			m.curr_load_idx -= DEFAULT_LIMIT
-			m.low_ts, m.high_ts = db.load_cmds(dbh, m.curr_load_idx - DEFAULT_LIMIT, DEFAULT_LIMIT)
-			db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
-		}
-	case .Esc:
-		return .Quit
-	}
-
-	return .None
 }
 
-search_view :: proc(ctx: ^tui.Context, ptr: rawptr) {
-	m := cast(^Search_Model)ptr
+search_view :: proc(ctx: ^tui.Context, m: ^Search_Model) {
+	draw_query(ctx, m)
+	draw_cmds(ctx, m)
+	draw_footer(ctx, m)
+	tui.render_frame(ctx)
+}
 
-	// Query line
-	strings.builder_reset(&m.ui_query)
-	strings.write_string(&m.ui_query, "> ")
-	strings.write_string(&m.ui_query, strings.to_string(m.query))
-	tui.draw_line(ctx, strings.to_string(m.ui_query))
+draw_query :: proc(ctx: ^tui.Context, m: ^Search_Model) {
+	strings.builder_reset(&m.line_buf)
+	strings.write_string(&m.line_buf, "> ")
+	strings.write_string(&m.line_buf, strings.to_string(m.query))
+	tui.draw_line(ctx, strings.to_string(m.line_buf))
+}
 
-	// Command list
-	for entry, i in m.cmds {
+draw_cmds :: proc(ctx: ^tui.Context, m: ^Search_Model) {
+	tui.table_draw(ctx, &m.table)
+}
 
-		style :=
-			i == m.selected ? style_cmd_highlighted : entry.exit_code > 0 ? style_cmd_err : style_cmd_default
+rebuild_table :: proc(ctx: ^tui.Context, m: ^Search_Model) {
+	tui.table_clear(&m.table)
+	for entry in m.cmds {
+		strings.builder_reset(&m.line_buf)
+		cmd := get_cmd_string(&m.line_buf, entry.cmd, ctx.size.x)
+		cmd_str := strings.clone(cmd, context.temp_allocator)
 
-		max_size := ctx.size.x - 100
-		cmd := get_cmd_string(entry.cmd, max_size)
-		tui.draw_line(ctx, cmd, style)
-
-		// Right-aligned metadata
 		strings.builder_reset(&m.line_buf)
 		humanize_time_sb(&m.line_buf, entry.timestamp_sec)
-		strings.write_string(&m.line_buf, " ")
-		humanize_duration_sb(&m.line_buf, entry.duration_ms)
-		meta := strings.to_string(m.line_buf)
-		meta_x := ctx.size.x - len(meta)
-		row := ctx.curr_line - 1
-		if meta_x > 0 {
-			tui.draw_raw(ctx, meta_x, row, meta, style)
-		}
-	}
+		time_str := strings.clone(strings.to_string(m.line_buf), context.temp_allocator)
 
-	// Status bar
+		strings.builder_reset(&m.line_buf)
+		humanize_duration_sb(&m.line_buf, entry.duration_ms)
+		dur_str := strings.clone(strings.to_string(m.line_buf), context.temp_allocator)
+
+		style := entry.exit_code > 0 ? style_cmd_err : style_cmd_default
+		tui.table_add_row(&m.table, style, cmd_str, time_str, dur_str)
+	}
+}
+
+draw_footer :: proc(ctx: ^tui.Context, m: ^Search_Model) {
 	strings.builder_reset(&m.line_buf)
-	ly, lm, ld := time.date(m.low_ts)
-	lh, lmin, ls := time.clock_from_time(m.low_ts)
-	hy, hm, hd := time.date(m.high_ts)
-	hh, hmin, hs := time.clock_from_time(m.high_ts)
-	fmt.sbprintf(
-		&m.line_buf,
-		"[%4d-%02d-%02d %02d:%02d:%02d — %4d-%02d-%02d %02d:%02d:%02d]",
-		ly,
-		int(lm),
-		ld,
-		lh,
-		lmin,
-		ls,
-		hy,
-		int(hm),
-		hd,
-		hh,
-		hmin,
-		hs,
-	)
-	tui.draw_raw(
-		ctx,
-		0,
-		ctx.size.y - 1,
-		strings.to_string(m.line_buf),
-		tui.Style{fg = tui.White, bg = tui.DarkGreen},
-	)
+	strings.write_byte(&m.line_buf, '[')
+	write_datetime_sb(&m.line_buf, m.low_ts)
+	strings.write_string(&m.line_buf, " — ")
+	write_datetime_sb(&m.line_buf, m.high_ts)
+	strings.write_byte(&m.line_buf, ']')
+	tui.draw_raw(ctx, 0, ctx.size.y - 1, strings.to_string(m.line_buf), style_cmd_highlighted)
 
 	version_str := "hist:version: " + VERSION
 	meta_x := ctx.size.x - len(version_str)
 	if meta_x > 0 {
-		tui.draw_raw(
-			ctx,
-			meta_x,
-			ctx.size.y - 1,
-			version_str,
-			tui.Style{fg = tui.White, bg = tui.DarkGreen},
-		)
+		tui.draw_raw(ctx, meta_x, ctx.size.y - 1, version_str, style_cmd_highlighted)
 	}
 }
 
+
+write_datetime_sb :: proc(sb: ^strings.Builder, t: time.Time) {
+	y, m, d := time.date(t)
+	h, min, s := time.clock_from_time(t)
+	fmt.sbprintf(sb, "%4d-%02d-%02d %02d:%02d:%02d", y, int(m), d, h, min, s)
+}
 
 humanize_time_sb :: proc(sb: ^strings.Builder, ts_sec: u32) {
 	now := time.now()
@@ -245,8 +248,7 @@ humanize_duration_sb :: proc(sb: ^strings.Builder, duration_ms: u32) {
 	}
 }
 
-get_cmd_string :: proc(cmd: string, max_size: int) -> string {
-	sb: strings.Builder
+get_cmd_string :: proc(sb: ^strings.Builder, cmd: string, max_size: int) -> string {
 	cmd := cmd
 	suffix := ""
 	if len(cmd) > max_size { 	// Avg size for timestamp and duration
@@ -256,14 +258,14 @@ get_cmd_string :: proc(cmd: string, max_size: int) -> string {
 
 	for r in strings.trim_right_space(cmd) {
 		if r == '\n' {
-			strings.write_string(&sb, " ⏎ ")
+			strings.write_string(sb, " ⏎ ")
 		} else if r == '\t' {
-			strings.write_byte(&sb, ' ')
+			strings.write_byte(sb, ' ')
 		} else {
-			strings.write_rune(&sb, r)
+			strings.write_rune(sb, r)
 		}
 	}
-	strings.write_string(&sb, suffix)
-	return strings.to_string(sb)
+	strings.write_string(sb, suffix)
+	return strings.to_string(sb^)
 }
 
