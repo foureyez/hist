@@ -19,7 +19,6 @@ Context :: struct {
 	clear_init:    bool,
 	buffer_string: strings.Builder,
 	size:          [2]int,
-	padding:       Padding,
 }
 
 Event :: union {
@@ -121,29 +120,33 @@ poll_event :: proc(ctx: ^Context, timeout: int = 60) -> Event {
 	return NoneEvent{}
 }
 
-raw_draw :: proc(ctx: ^Context, x, y: int, text: string, fg: Color, bg: Color = NoColor) {
-	draw_text(&ctx.buffer, x + ctx.padding.left, y + ctx.padding.top, text, fg, bg)
+draw_raw :: proc(ctx: ^Context, x, y: int, text: string, style: Style) {
+	set_cell(&ctx.buffer, x, y, text, style)
 }
 
-write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color = NoColor) {
-	x := ctx.padding.left
-	y := ctx.curr_line + ctx.padding.top
+draw_line :: proc(ctx: ^Context, text: string, style: Style = DefaultStyle) {
+	x := 0
+	y := ctx.curr_line
 
-	draw_text(&ctx.buffer, x, y, text, fg, bg)
-	// Clear remainder of the line so old text doesn't linger
-	col_start := x + len(text)
-	col_end := x + ctx.size.x
-	if y >= 0 && y < ctx.buffer.height {
+	rune_count := set_cell(&ctx.buffer, x, y, text, style)
+
+	// Clear remaining line
+	{
+		col_start := x + rune_count
+		col_end := ctx.size.x - 1
 		for col_start < col_end {
 			idx := y * ctx.buffer.width + col_start
-			ctx.buffer.cells[idx].char = ' '
-			ctx.buffer.cells[idx].fg = NoColor
-			ctx.buffer.cells[idx].bg = bg
+			ctx.buffer.cells[idx] = Cell {
+				char  = ' ',
+				style = style,
+			}
 			col_start += 1
 		}
 	}
+
 	ctx.curr_line += 1
 }
+
 
 render_frame :: proc(ctx: ^Context) {
 	render_buffer(ctx)

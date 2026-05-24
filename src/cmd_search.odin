@@ -9,6 +9,21 @@ import "core:time"
 import "db"
 import "tui"
 
+style_cmd_highlighted := tui.Style {
+	fg = tui.White,
+	bg = tui.DarkGreen,
+}
+
+style_cmd_default := tui.Style {
+	fg = tui.White,
+	bg = tui.NoColor,
+}
+
+style_cmd_err := tui.Style {
+	fg = tui.Red,
+	bg = tui.NoColor,
+}
+
 Search_Model :: struct {
 	cmds:          [dynamic]db.Command_Entry,
 	selected:      int,
@@ -21,7 +36,7 @@ Search_Model :: struct {
 	high_ts:       time.Time,
 }
 
-DEFAULT_LIMIT :: 10000
+DEFAULT_LIMIT :: 100000
 
 search_cmd :: proc(args: []string) -> ^cli.Error {
 	low_ts, high_ts := db.load_cmds(dbh, 0, DEFAULT_LIMIT)
@@ -78,6 +93,9 @@ search_update :: proc(ctx: ^tui.Context, ptr: rawptr, msg: tui.Msg) -> tui.Cmd {
 	case .Char:
 		strings.write_rune(&m.query, key_msg.key.char)
 		db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
+		if len(m.cmds) < m.selected {
+			m.selected = 0
+		}
 	case .Backspace:
 		strings.pop_rune(&m.query)
 		db.search_cmd(dbh, &m.cmds, strings.to_string(m.query), ctx.size.y - 5)
@@ -117,24 +135,28 @@ search_view :: proc(ctx: ^tui.Context, ptr: rawptr) {
 	strings.builder_reset(&m.ui_query)
 	strings.write_string(&m.ui_query, "> ")
 	strings.write_string(&m.ui_query, strings.to_string(m.query))
-	tui.write_string(ctx, strings.to_string(m.ui_query))
+	tui.draw_line(ctx, strings.to_string(m.ui_query))
 
 	// Command list
 	for entry, i in m.cmds {
-		fg := i == m.selected ? tui.Grey : entry.exit_code > 0 ? tui.Red : tui.White
 
-		tui.write_string(ctx, entry.cmd, fg)
+		style :=
+			i == m.selected ? style_cmd_highlighted : entry.exit_code > 0 ? style_cmd_err : style_cmd_default
+
+		max_size := ctx.size.x - 100
+		cmd := get_cmd_string(entry.cmd, max_size)
+		tui.draw_line(ctx, cmd, style)
 
 		// Right-aligned metadata
 		strings.builder_reset(&m.line_buf)
 		humanize_time_sb(&m.line_buf, entry.timestamp_sec)
-		fmt.sbprint(&m.line_buf, " ")
+		strings.write_string(&m.line_buf, " ")
 		humanize_duration_sb(&m.line_buf, entry.duration_ms)
 		meta := strings.to_string(m.line_buf)
 		meta_x := ctx.size.x - len(meta)
 		row := ctx.curr_line - 1
 		if meta_x > 0 {
-			tui.raw_draw(ctx, meta_x, row, meta, fg)
+			tui.draw_raw(ctx, meta_x, row, meta, style)
 		}
 	}
 
@@ -160,12 +182,24 @@ search_view :: proc(ctx: ^tui.Context, ptr: rawptr) {
 		hmin,
 		hs,
 	)
-	tui.raw_draw(ctx, 0, ctx.size.y - 1, strings.to_string(m.line_buf), tui.White, tui.DarkGreen)
+	tui.draw_raw(
+		ctx,
+		0,
+		ctx.size.y - 1,
+		strings.to_string(m.line_buf),
+		tui.Style{fg = tui.White, bg = tui.DarkGreen},
+	)
 
 	version_str := "hist:version: " + VERSION
 	meta_x := ctx.size.x - len(version_str)
 	if meta_x > 0 {
-		tui.raw_draw(ctx, meta_x, ctx.size.y - 1, version_str, tui.White, tui.DarkGreen)
+		tui.draw_raw(
+			ctx,
+			meta_x,
+			ctx.size.y - 1,
+			version_str,
+			tui.Style{fg = tui.White, bg = tui.DarkGreen},
+		)
 	}
 }
 
@@ -209,5 +243,27 @@ humanize_duration_sb :: proc(sb: ^strings.Builder, duration_ms: u32) {
 		fmt.sbprintf(sb, "%dms", duration_ms)
 
 	}
+}
+
+get_cmd_string :: proc(cmd: string, max_size: int) -> string {
+	sb: strings.Builder
+	cmd := cmd
+	suffix := ""
+	if len(cmd) > max_size { 	// Avg size for timestamp and duration
+		cmd, _ = strings.substring_to(cmd, max_size)
+		suffix = "..."
+	}
+
+	for r in strings.trim_right_space(cmd) {
+		if r == '\n' {
+			strings.write_string(&sb, " ⏎ ")
+		} else if r == '\t' {
+			strings.write_byte(&sb, ' ')
+		} else {
+			strings.write_rune(&sb, r)
+		}
+	}
+	strings.write_string(&sb, suffix)
+	return strings.to_string(sb)
 }
 

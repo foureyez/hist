@@ -1,13 +1,14 @@
+#+private
 package tui
 
 import "core:mem"
 import "core:os"
 import "core:strings"
 
+
 Cell :: struct {
-	char: rune,
-	fg:   Color,
-	bg:   Color,
+	char:  rune,
+	style: Style,
 }
 
 Buffer :: struct {
@@ -32,39 +33,30 @@ destroy_buffer :: proc(b: ^Buffer) {
 clear_buffer :: proc(b: ^Buffer) {
 	for i in 0 ..< len(b.cells) {
 		b.cells[i] = Cell {
-			char = ' ',
-			bg   = NoColor,
+			char  = ' ',
+			style = NoStyle,
 		}
 	}
 }
 
-draw_text :: proc(b: ^Buffer, x, y: int, text: string, fg: Color, bg: Color) {
+set_cell :: proc(b: ^Buffer, x, y: int, text: string, style: Style) -> int {
 	row := y
 	col := x
 	for r in text {
 		if col >= 0 && col < b.width && row >= 0 && row < b.height {
 			idx := (row * b.width) + col
 			b.cells[idx].char = r
-			b.cells[idx].fg = fg
-			b.cells[idx].bg = bg
+			b.cells[idx].style = style
 		}
 		col += 1
 	}
+	return col - x
 }
 
 render_buffer :: proc(ctx: ^Context) {
 	strings.builder_reset(&ctx.buffer_string)
 	cursor_x, cursor_y := -1, -1
-	last_fg := Color {
-		r = -2,
-		g = -2,
-		b = -2,
-	}
-	last_bg := Color {
-		r = -2,
-		g = -2,
-		b = -2,
-	}
+	last_style := NoStyle
 
 	width := ctx.buffer.width
 	total := len(ctx.buffer.cells)
@@ -95,8 +87,8 @@ render_buffer :: proc(ctx: ^Context) {
 				cursor_x, cursor_y = x, y
 			}
 
-			is_style_changed := last_fg != cell.fg || last_bg != cell.bg
-			last_fg, last_bg = render_cell(&ctx.buffer_string, cell, is_style_changed)
+			is_style_changed := last_style != cell.style
+			last_style = render_cell(&ctx.buffer_string, cell, is_style_changed)
 
 			ctx.back_buffer.cells[i] = cell
 			cursor_x = x + 1
@@ -114,7 +106,7 @@ is_cell_changed :: proc(curr: Cell, last: Cell) -> bool {
 
 // Optimization: fast color value write using ascii table
 @(private = "file")
-write_color_val :: #force_inline proc(sb: ^strings.Builder, v: i16) {
+write_color_val :: #force_inline proc(sb: ^strings.Builder, v: u8) {
 	if v >= 0 && v <= 255 {
 		strings.write_byte(sb, ';')
 		val := int(v)
@@ -135,20 +127,20 @@ write_color_val :: #force_inline proc(sb: ^strings.Builder, v: i16) {
 	}
 }
 
-render_cell :: proc(sb: ^strings.Builder, cell: Cell, is_style_changed: bool) -> (Color, Color) {
+render_cell :: proc(sb: ^strings.Builder, cell: Cell, is_style_changed: bool) -> Style {
 	if is_style_changed {
 		strings.write_string(sb, "\x1b[38;2")
-		write_color_val(sb, cell.fg.r)
-		write_color_val(sb, cell.fg.g)
-		write_color_val(sb, cell.fg.b)
+		write_color_val(sb, cell.style.fg.r)
+		write_color_val(sb, cell.style.fg.g)
+		write_color_val(sb, cell.style.fg.b)
 
-		if cell.bg == NoColor {
+		if cell.style.bg == NoColor {
 			strings.write_string(sb, ";49")
 		} else {
 			strings.write_string(sb, ";48;2")
-			write_color_val(sb, cell.bg.r)
-			write_color_val(sb, cell.bg.g)
-			write_color_val(sb, cell.bg.b)
+			write_color_val(sb, cell.style.bg.r)
+			write_color_val(sb, cell.style.bg.g)
+			write_color_val(sb, cell.style.bg.b)
 		}
 		strings.write_byte(sb, 'm')
 	}
@@ -159,6 +151,6 @@ render_cell :: proc(sb: ^strings.Builder, cell: Cell, is_style_changed: bool) ->
 	} else {
 		strings.write_rune(sb, cell.char)
 	}
-	return cell.fg, cell.bg
+	return cell.style
 }
 
