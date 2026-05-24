@@ -137,6 +137,7 @@ write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color =
 		for col_start < col_end {
 			idx := y * ctx.buffer.width + col_start
 			ctx.buffer.cells[idx].char = ' '
+			ctx.buffer.cells[idx].fg = NoColor
 			ctx.buffer.cells[idx].bg = bg
 			col_start += 1
 		}
