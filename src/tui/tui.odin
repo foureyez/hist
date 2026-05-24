@@ -128,18 +128,17 @@ raw_draw :: proc(ctx: ^Context, x, y: int, text: string, fg: Color, bg: Color = 
 write_string :: proc(ctx: ^Context, text: string, fg: Color = White, bg: Color = NoColor) {
 	x := ctx.padding.left
 	y := ctx.curr_line + ctx.padding.top
+
 	draw_text(&ctx.buffer, x, y, text, fg, bg)
 	// Clear remainder of the line so old text doesn't linger
-	col := x + len(text)
-	end := x + ctx.size.x
+	col_start := x + len(text)
+	col_end := x + ctx.size.x
 	if y >= 0 && y < ctx.buffer.height {
-		for col < end {
-			idx := y * ctx.buffer.width + col
-			ctx.buffer.cells[idx] = Cell {
-				char = ' ',
-				bg   = bg,
-			}
-			col += 1
+		for col_start < col_end {
+			idx := y * ctx.buffer.width + col_start
+			ctx.buffer.cells[idx].char = ' '
+			ctx.buffer.cells[idx].bg = bg
+			col_start += 1
 		}
 	}
 	ctx.curr_line += 1
