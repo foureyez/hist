@@ -137,9 +137,17 @@ draw_line :: proc(ctx: ^Context, text: string, style: Style = DefaultStyle) {
 	rune_count := set_cell(&ctx.buffer, x, y, text, style)
 
 	// Clear remaining line
-	{
+	if 0 <= y && y < ctx.buffer.height {
 		col_start := x + rune_count
+		if col_start < 0 {
+			col_start = 0
+		}
+
 		col_end := ctx.size.x
+		if col_end > ctx.buffer.width {
+			col_end = ctx.buffer.width
+		}
+
 		for col_start < col_end {
 			idx := y * ctx.buffer.width + col_start
 			ctx.buffer.cells[idx] = Cell {
