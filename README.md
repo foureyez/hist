@@ -64,19 +64,19 @@ source ~/.zshrc
 
 ## CLI Commands
 
-### `hist init zsh`
+`hist init zsh`
 
 Prints the Zsh shell integration script.
 
-### `hist add start <cmd>`
+`hist add start <cmd>`
 
 Creates a history record and prints a record ID.
 
-### `hist add end <id> <exit_code> <duration_ms>`
+`hist add end <id> <exit_code> <duration_ms>`
 
 Completes an existing history record with exit code and duration.
 
-### `hist search`
+`hist search`
 
 Launches the interactive TUI search.
 
@@ -89,7 +89,7 @@ Launches the interactive TUI search.
 | `Ctrl+R` | Load next page of history |
 | `Ctrl+G` | Load previous page of history |
 
-### `hist version`
+`hist version`
 
 Prints the application version (currently `0.0.2`).
 
