@@ -54,6 +54,7 @@ search_cmd :: proc(args: []string) -> ^cli.Error {
 	ctx, err := tui.new_tui({.FULLSCREEN}, input = tty)
 	if err != nil {
 		log.error(err)
+		os.close(tty)
 		return nil
 	}
 
