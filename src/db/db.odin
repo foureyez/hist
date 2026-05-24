@@ -139,7 +139,7 @@ update_cmd :: proc(db: ^DB, id: u64, duration_ms: u32, exit_code: u8) -> Error {
 
 	idx: Command_Index
 	if !deserialize(out, &idx) {
-		log.error("unable to deserialize command at offset: %d", offset)
+		log.errorf("unable to deserialize command at offset: %d", offset)
 		return .UpdateCmdFailed
 	}
 
